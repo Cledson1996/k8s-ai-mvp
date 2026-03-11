@@ -581,9 +581,7 @@ function YamlModal({
 
         <div className="overflow-auto bg-ink px-5 py-5">
           {yaml ? (
-            <pre className="whitespace-pre-wrap break-words text-sm text-white">
-              <code>{yaml}</code>
-            </pre>
+            <YamlCodeBlock yaml={yaml} />
           ) : (
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/75">
               O YAML bruto ainda nao esta disponivel para este recurso nesta coleta.
@@ -593,4 +591,101 @@ function YamlModal({
       </div>
     </div>
   );
+}
+
+function YamlCodeBlock({ yaml }: { yaml: string }) {
+  const lines = yaml.replace(/\r\n/g, "\n").split("\n");
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#06111d]">
+      <div className="flex items-center justify-between border-b border-white/10 bg-[#091826] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-rose-400" />
+          <span className="h-3 w-3 rounded-full bg-amber-300" />
+          <span className="h-3 w-3 rounded-full bg-emerald-400" />
+        </div>
+        <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-white/45">
+          YAML
+        </p>
+      </div>
+
+      <div className="overflow-auto">
+        <table className="min-w-full border-separate border-spacing-0">
+          <tbody>
+            {lines.map((line, index) => (
+              <tr key={`${index}-${line}`} className="align-top odd:bg-white/[0.02]">
+                <td className="select-none border-r border-white/5 px-4 py-1 text-right font-[var(--font-mono)] text-xs text-white/30">
+                  {index + 1}
+                </td>
+                <td className="px-4 py-1 font-[var(--font-mono)] text-sm">
+                  <YamlLine line={line} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function YamlLine({ line }: { line: string }) {
+  if (!line.trim()) {
+    return <span className="text-white/25">&nbsp;</span>;
+  }
+
+  const indent = line.match(/^\s*/)?.[0] ?? "";
+  const content = line.slice(indent.length);
+  const listPrefix = content.startsWith("- ") ? "- " : "";
+  const body = listPrefix ? content.slice(2) : content;
+  const keyMatch = body.match(/^([^:#]+):(.*)$/);
+
+  return (
+    <span className="whitespace-pre-wrap break-words text-white/90">
+      <span className="text-white/25">{indent}</span>
+      {listPrefix ? <span className="text-cyan-300">{listPrefix}</span> : null}
+      {keyMatch ? (
+        <>
+          <span className="text-sky-300">{keyMatch[1]}</span>
+          <span className="text-white/55">:</span>
+          {keyMatch[2] ? (
+            <>
+              <span className="text-white/35"> </span>
+              <YamlValue value={keyMatch[2].trimStart()} />
+            </>
+          ) : null}
+        </>
+      ) : (
+        <YamlValue value={body} />
+      )}
+    </span>
+  );
+}
+
+function YamlValue({ value }: { value: string }) {
+  if (!value) {
+    return null;
+  }
+
+  if (value === "|" || value === "|-" || value === ">" || value === ">-") {
+    return <span className="text-fuchsia-300">{value}</span>;
+  }
+
+  if (value === "true" || value === "false" || value === "null") {
+    return <span className="text-fuchsia-300">{value}</span>;
+  }
+
+  if (/^-?\d+(\.\d+)?$/.test(value)) {
+    return <span className="text-amber-300">{value}</span>;
+  }
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'")) ||
+    value === "<redacted>"
+  ) {
+    return <span className="text-emerald-300">{value}</span>;
+  }
+
+  return <span className="text-white/88">{value}</span>;
 }
