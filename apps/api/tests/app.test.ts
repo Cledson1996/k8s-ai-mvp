@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp, type AppServices } from "../src/app.js";
-import type { AnalysisResult, AnalysisService } from "../src/services/analysis/service.js";
+import type {
+  AnalysisResult,
+  AnalysisService,
+} from "../src/services/analysis/service.js";
 
 const analysisResult: AnalysisResult = {
   degradedSources: ["k8sgpt: missing command"],
@@ -15,11 +18,11 @@ const analysisResult: AnalysisResult = {
       totalRestarts: 4,
       usage: {
         cpuCores: 1.1,
-        memoryBytes: 2048
+        memoryBytes: 2048,
       },
       topNamespaces: [],
       topRestarts: [],
-      highlightedIssues: []
+      highlightedIssues: [],
     },
     nodes: [
       {
@@ -28,10 +31,16 @@ const analysisResult: AnalysisResult = {
         roles: ["worker"],
         taints: [],
         usage: {},
+        capacity: {
+          cpu: {},
+          memory: {},
+          storage: {},
+        },
         pressure: [],
         podCount: 4,
-        topWorkloads: []
-      }
+        workloads: [],
+        topWorkloads: [],
+      },
     ],
     namespaces: [],
     pods: [],
@@ -51,8 +60,8 @@ const analysisResult: AnalysisResult = {
         resourceRef: {
           kind: "Deployment",
           name: "payments",
-          namespace: "prod"
-        }
+          namespace: "prod",
+        },
       },
       {
         id: "configmap-unused-prod-legacy-config",
@@ -69,11 +78,11 @@ const analysisResult: AnalysisResult = {
         resourceRef: {
           kind: "ConfigMap",
           name: "legacy-config",
-          namespace: "prod"
-        }
-      }
-    ]
-  }
+          namespace: "prod",
+        },
+      },
+    ],
+  },
 };
 
 describe("api app", () => {
@@ -88,17 +97,31 @@ describe("api app", () => {
           clusterName: "corp-cluster",
           collectedAt: "2026-03-11T10:00:00.000Z",
           resourceCount: 0,
-          issueCount: 1
+          issueCount: 1,
         },
-        degradedSources: []
+        degradedSources: [],
       }),
       getNamespace: vi.fn().mockResolvedValue(undefined),
       getResourceDetail: vi.fn().mockResolvedValue(undefined),
       getResourceRelations: vi.fn().mockResolvedValue(undefined),
-      listSnapshots: vi.fn().mockResolvedValue({
-        snapshots: []
+      listDeployments: vi.fn().mockResolvedValue({
+        deployments: [],
+        snapshot: {
+          id: "s",
+          clusterName: "c",
+          collectedAt: "",
+          resourceCount: 0,
+          issueCount: 0,
+        },
+        degradedSources: [],
       }),
-      getSnapshotDiff: vi.fn().mockResolvedValue(undefined)
+      listWorkloads: vi
+        .fn()
+        .mockResolvedValue({ cards: [], pods: [], degradedSources: [] }),
+      listSnapshots: vi.fn().mockResolvedValue({
+        snapshots: [],
+      }),
+      getSnapshotDiff: vi.fn().mockResolvedValue(undefined),
     };
   }
 
@@ -110,15 +133,15 @@ describe("api app", () => {
           answer: "test",
           citations: [],
           suggestedFollowUps: [],
-          generatedAt: "2026-03-11T10:00:00.000Z"
-        })
-      }
+          generatedAt: "2026-03-11T10:00:00.000Z",
+        }),
+      },
     };
 
     const app = await createApp(services);
     const response = await app.inject({
       method: "GET",
-      url: "/api/overview"
+      url: "/api/overview",
     });
 
     expect(response.statusCode).toBe(200);
@@ -129,14 +152,14 @@ describe("api app", () => {
     const services: AppServices = {
       analysisService: createAnalysisServiceMock(),
       chatService: {
-        answerQuestion: vi.fn()
-      }
+        answerQuestion: vi.fn(),
+      },
     };
 
     const app = await createApp(services);
     const response = await app.inject({
       method: "GET",
-      url: "/api/issues?namespace=prod"
+      url: "/api/issues?namespace=prod",
     });
 
     expect(response.statusCode).toBe(200);
@@ -147,14 +170,14 @@ describe("api app", () => {
     const services: AppServices = {
       analysisService: createAnalysisServiceMock(),
       chatService: {
-        answerQuestion: vi.fn()
-      }
+        answerQuestion: vi.fn(),
+      },
     };
 
     const app = await createApp(services);
     const response = await app.inject({
       method: "POST",
-      url: "/api/analysis/run"
+      url: "/api/analysis/run",
     });
 
     expect(response.statusCode).toBe(200);
@@ -165,18 +188,18 @@ describe("api app", () => {
     const services: AppServices = {
       analysisService: createAnalysisServiceMock(),
       chatService: {
-        answerQuestion: vi.fn()
-      }
+        answerQuestion: vi.fn(),
+      },
     };
 
     const app = await createApp(services);
     const filtered = await app.inject({
       method: "GET",
-      url: "/api/issues?category=cleanup"
+      url: "/api/issues?category=cleanup",
     });
     const cleanup = await app.inject({
       method: "GET",
-      url: "/api/issues/cleanup"
+      url: "/api/issues/cleanup",
     });
 
     expect(filtered.statusCode).toBe(200);
@@ -194,9 +217,9 @@ describe("api app", () => {
           answer: "Os pods com mais reinicios sao prod/api-123 (9).",
           citations: [{ type: "pod", label: "prod/api-123" }],
           suggestedFollowUps: ["Quais issues estao ligados a esse pod?"],
-          generatedAt: "2026-03-11T10:00:00.000Z"
-        })
-      }
+          generatedAt: "2026-03-11T10:00:00.000Z",
+        }),
+      },
     };
 
     const app = await createApp(services);
@@ -204,8 +227,8 @@ describe("api app", () => {
       method: "POST",
       url: "/api/chat",
       payload: {
-        question: "Quais pods reiniciam mais?"
-      }
+        question: "Quais pods reiniciam mais?",
+      },
     });
 
     expect(response.statusCode).toBe(200);
@@ -222,35 +245,35 @@ describe("api app", () => {
             name: "prod",
             podCount: 12,
             unhealthyPodCount: 1,
-            restartCount: 3
+            restartCount: 3,
           },
           resourceCounts: {
-            Deployment: 2
+            Deployment: 2,
           },
           resources: [],
-          topIssues: []
-        }
+          topIssues: [],
+        },
       ],
       snapshot: {
         id: "snapshot-1",
         clusterName: "corp-cluster",
         collectedAt: "2026-03-11T10:00:00.000Z",
         resourceCount: 12,
-        issueCount: 1
+        issueCount: 1,
       },
-      degradedSources: []
+      degradedSources: [],
     });
 
     const app = await createApp({
       analysisService,
       chatService: {
-        answerQuestion: vi.fn()
-      }
+        answerQuestion: vi.fn(),
+      },
     });
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/namespaces"
+      url: "/api/namespaces",
     });
 
     expect(response.statusCode).toBe(200);

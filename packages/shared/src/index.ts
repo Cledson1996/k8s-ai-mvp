@@ -470,3 +470,37 @@ export interface DeploymentsResponse {
   snapshot: SnapshotSummary;
   degradedSources: string[];
 }
+
+export interface WorkloadStatusCount {
+  status: string;
+  count: number;
+}
+
+export interface WorkloadCardSummary {
+  kind: string;
+  label: string;
+  total: number;
+  statuses: WorkloadStatusCount[];
+}
+
+export interface WorkloadPodDetail {
+  name: string;
+  namespace: string;
+  phase: string;
+  nodeName?: string;
+  restarts: number;
+  ready: boolean;
+  reason?: string;
+  cpuCores?: number;
+  memoryBytes?: number;
+  age: string;
+  controllerKind?: string;
+  controllerName?: string;
+  events: ResourceEvent[];
+}
+
+export interface WorkloadsResponse {
+  cards: WorkloadCardSummary[];
+  pods: WorkloadPodDetail[];
+  degradedSources: string[];
+}

@@ -4,7 +4,10 @@ import { getConfig, type AppConfig } from "./config.js";
 import { LiveK8sGptConnector } from "./connectors/k8sgpt.js";
 import { LiveKubernetesConnector } from "./connectors/kubernetes.js";
 import { LivePrometheusConnector } from "./connectors/prometheus.js";
-import { LiveAnalysisService, type AnalysisService } from "./services/analysis/service.js";
+import {
+  LiveAnalysisService,
+  type AnalysisService,
+} from "./services/analysis/service.js";
 import { LiveChatService, type ChatService } from "./services/chat/service.js";
 import { SnapshotRepository } from "./services/snapshot/repository.js";
 
@@ -18,33 +21,33 @@ export function buildServices(config: AppConfig = getConfig()): AppServices {
     new LiveKubernetesConnector(config),
     new LivePrometheusConnector(config),
     new LiveK8sGptConnector(config),
-    new SnapshotRepository(config.SQLITE_PATH)
+    new SnapshotRepository(config.SQLITE_PATH),
   );
 
   return {
     analysisService,
-    chatService: new LiveChatService(config)
+    chatService: new LiveChatService(config),
   };
 }
 
 export async function createApp(services: AppServices = buildServices()) {
   const app = Fastify({
-    logger: false
+    logger: false,
   });
 
   await app.register(cors, {
-    origin: true
+    origin: true,
   });
 
   app.get("/health", async () => ({
-    status: "ok"
+    status: "ok",
   }));
 
   app.get("/api/overview", async () => {
     const result = await services.analysisService.getLatestOrRun();
     return {
       overview: result.snapshot.overview,
-      degradedSources: result.degradedSources
+      degradedSources: result.degradedSources,
     };
   });
 
@@ -52,7 +55,7 @@ export async function createApp(services: AppServices = buildServices()) {
     const result = await services.analysisService.getLatestOrRun();
     return {
       nodes: result.snapshot.nodes,
-      degradedSources: result.degradedSources
+      degradedSources: result.degradedSources,
     };
   });
 
@@ -87,23 +90,35 @@ export async function createApp(services: AppServices = buildServices()) {
 
     return {
       issues,
-      degradedSources: result.degradedSources
+      degradedSources: result.degradedSources,
     };
   });
 
   app.get("/api/issues/cleanup", async () => {
     const result = await services.analysisService.getLatestOrRun();
     return {
-      issues: result.snapshot.issues.filter((issue) => issue.category === "cleanup"),
-      degradedSources: result.degradedSources
+      issues: result.snapshot.issues.filter(
+        (issue) => issue.category === "cleanup",
+      ),
+      degradedSources: result.degradedSources,
     };
   });
 
-  app.post("/api/analysis/run", async () => services.analysisService.runAnalysis());
+  app.post("/api/analysis/run", async () =>
+    services.analysisService.runAnalysis(),
+  );
 
-  app.get("/api/namespaces", async () => services.analysisService.listNamespaces());
+  app.get("/api/namespaces", async () =>
+    services.analysisService.listNamespaces(),
+  );
 
-  app.get("/api/deployments", async () => services.analysisService.listDeployments());
+  app.get("/api/deployments", async () =>
+    services.analysisService.listDeployments(),
+  );
+
+  app.get("/api/workloads", async () =>
+    services.analysisService.listWorkloads(),
+  );
 
   app.get("/api/namespaces/:name", async (request, reply) => {
     const { name } = request.params as { name: string };
@@ -111,7 +126,7 @@ export async function createApp(services: AppServices = buildServices()) {
     if (!result) {
       reply.code(404);
       return {
-        error: "namespace not found"
+        error: "namespace not found",
       };
     }
 
@@ -119,40 +134,67 @@ export async function createApp(services: AppServices = buildServices()) {
   });
 
   app.get("/api/resources/:kind/:namespace/:name", async (request, reply) => {
-    const { kind, namespace, name } = request.params as { kind: string; namespace: string; name: string };
-    const result = await services.analysisService.getResourceDetail(kind as never, normalizeNamespace(namespace), name);
+    const { kind, namespace, name } = request.params as {
+      kind: string;
+      namespace: string;
+      name: string;
+    };
+    const result = await services.analysisService.getResourceDetail(
+      kind as never,
+      normalizeNamespace(namespace),
+      name,
+    );
     if (!result) {
       reply.code(404);
       return {
-        error: "resource not found"
+        error: "resource not found",
       };
     }
 
     return result;
   });
 
-  app.get("/api/resources/:kind/:namespace/:name/relations", async (request, reply) => {
-    const { kind, namespace, name } = request.params as { kind: string; namespace: string; name: string };
-    const result = await services.analysisService.getResourceRelations(kind as never, normalizeNamespace(namespace), name);
-    if (!result) {
-      reply.code(404);
-      return {
-        error: "resource not found"
+  app.get(
+    "/api/resources/:kind/:namespace/:name/relations",
+    async (request, reply) => {
+      const { kind, namespace, name } = request.params as {
+        kind: string;
+        namespace: string;
+        name: string;
       };
-    }
+      const result = await services.analysisService.getResourceRelations(
+        kind as never,
+        normalizeNamespace(namespace),
+        name,
+      );
+      if (!result) {
+        reply.code(404);
+        return {
+          error: "resource not found",
+        };
+      }
 
-    return result;
-  });
+      return result;
+    },
+  );
 
-  app.get("/api/snapshots", async () => services.analysisService.listSnapshots());
+  app.get("/api/snapshots", async () =>
+    services.analysisService.listSnapshots(),
+  );
 
   app.get("/api/snapshots/:id/diff/:previousId", async (request, reply) => {
-    const { id, previousId } = request.params as { id: string; previousId: string };
-    const result = await services.analysisService.getSnapshotDiff(id, previousId);
+    const { id, previousId } = request.params as {
+      id: string;
+      previousId: string;
+    };
+    const result = await services.analysisService.getSnapshotDiff(
+      id,
+      previousId,
+    );
     if (!result) {
       reply.code(404);
       return {
-        error: "snapshot diff not found"
+        error: "snapshot diff not found",
       };
     }
 
@@ -164,7 +206,7 @@ export async function createApp(services: AppServices = buildServices()) {
     if (!body?.question?.trim()) {
       reply.code(400);
       return {
-        error: "question is required"
+        error: "question is required",
       };
     }
 

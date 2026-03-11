@@ -16,8 +16,10 @@ import type {
   SnapshotDiff as BackendSnapshotDiff,
   SnapshotDiffResponse as BackendSnapshotDiffResponse,
   SnapshotsResponse as BackendSnapshotsResponse,
-  SnapshotSummary as BackendSnapshotSummary
+  SnapshotSummary as BackendSnapshotSummary,
+  WorkloadsResponse as BackendWorkloadsResponse,
 } from "@k8s-ai-mvp/shared";
+
 import type {
   ClusterSnapshot,
   DeploymentInventory,
@@ -32,7 +34,7 @@ import type {
   ResourceResilience,
   ResourceRollout,
   ResourceScheduling,
-  SnapshotDiff
+  SnapshotDiff,
 } from "./explorer-types";
 import {
   getSampleNamespace,
@@ -41,15 +43,16 @@ import {
   sampleAnalysisResponse,
   sampleChatPrompts,
   sampleNamespaces,
-  sampleSnapshots
+  sampleSnapshots,
 } from "./sample-data";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
 async function fetchJson<T>(path: string, fallback: T): Promise<T> {
   try {
     const response = await fetch(`${apiBaseUrl}${path}`, {
-      cache: "no-store"
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -83,12 +86,12 @@ export async function getOverviewPageData(): Promise<{
 }> {
   const response = await fetchJson<OverviewResponse>("/api/overview", {
     overview: sampleAnalysisResponse.snapshot.overview,
-    degradedSources: sampleAnalysisResponse.degradedSources
+    degradedSources: sampleAnalysisResponse.degradedSources,
   });
 
   return {
     overview: response.overview,
-    degradedSources: response.degradedSources
+    degradedSources: response.degradedSources,
   };
 }
 
@@ -98,12 +101,12 @@ export async function getNodesPageData(): Promise<{
 }> {
   const response = await fetchJson<NodesResponse>("/api/nodes", {
     nodes: [],
-    degradedSources: ["api unavailable"]
+    degradedSources: ["api unavailable"],
   });
 
   return {
     nodes: response.nodes,
-    degradedSources: response.degradedSources
+    degradedSources: response.degradedSources,
   };
 }
 
@@ -111,22 +114,33 @@ export async function getDeploymentsPageData(): Promise<{
   deployments: DeploymentInventory[];
   degradedSources: string[];
 }> {
-  const response = await fetchJson<BackendDeploymentsResponse>("/api/deployments", {
-    deployments: [],
-    snapshot: {
-      id: "unavailable",
-      clusterName: "unknown",
-      collectedAt: new Date(0).toISOString(),
-      resourceCount: 0,
-      issueCount: 0
+  const response = await fetchJson<BackendDeploymentsResponse>(
+    "/api/deployments",
+    {
+      deployments: [],
+      snapshot: {
+        id: "unavailable",
+        clusterName: "unknown",
+        collectedAt: new Date(0).toISOString(),
+        resourceCount: 0,
+        issueCount: 0,
+      },
+      degradedSources: ["api unavailable"],
     },
-    degradedSources: ["api unavailable"]
-  });
+  );
 
   return {
     deployments: response.deployments.map(toDeploymentInventory),
-    degradedSources: response.degradedSources
+    degradedSources: response.degradedSources,
   };
+}
+
+export async function getWorkloadsPageData(): Promise<BackendWorkloadsResponse> {
+  return fetchJson<BackendWorkloadsResponse>("/api/workloads", {
+    cards: [],
+    pods: [],
+    degradedSources: ["api unavailable"],
+  });
 }
 
 export async function getIssuesPageData(): Promise<{
@@ -135,12 +149,12 @@ export async function getIssuesPageData(): Promise<{
 }> {
   const response = await fetchJson<IssuesResponse>("/api/issues", {
     issues: sampleAnalysisResponse.snapshot.issues,
-    degradedSources: sampleAnalysisResponse.degradedSources
+    degradedSources: sampleAnalysisResponse.degradedSources,
   });
 
   return {
     issues: response.issues,
-    degradedSources: response.degradedSources
+    degradedSources: response.degradedSources,
   };
 }
 
@@ -150,12 +164,12 @@ export async function getChatPageData(): Promise<{
 }> {
   const response = await fetchJson<IssuesResponse>("/api/issues", {
     issues: sampleAnalysisResponse.snapshot.issues,
-    degradedSources: sampleAnalysisResponse.degradedSources
+    degradedSources: sampleAnalysisResponse.degradedSources,
   });
 
   return {
     suggestedQuestions: sampleChatPrompts,
-    issues: response.issues
+    issues: response.issues,
   };
 }
 
@@ -172,13 +186,13 @@ export async function getExplorerLandingData(): Promise<{
         clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
         collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
         resourceCount: 0,
-        issueCount: 0
+        issueCount: 0,
       },
-      degradedSources: sampleAnalysisResponse.degradedSources
+      degradedSources: sampleAnalysisResponse.degradedSources,
     }),
     fetchJson<BackendSnapshotsResponse>("/api/snapshots", {
-      snapshots: []
-    })
+      snapshots: [],
+    }),
   ]);
 
   const namespaces =
@@ -193,7 +207,7 @@ export async function getExplorerLandingData(): Promise<{
   return {
     namespaces,
     snapshots,
-    degradedSources: Array.from(new Set(namespacesResponse.degradedSources))
+    degradedSources: Array.from(new Set(namespacesResponse.degradedSources)),
   };
 }
 
@@ -203,19 +217,22 @@ export async function getNamespacePageData(name: string): Promise<{
   degradedSources: string[];
 }> {
   const [namespaceResponse, snapshotsResponse] = await Promise.all([
-    fetchJson<BackendNamespaceDetailResponse>(`/api/namespaces/${encodeURIComponent(name)}`, {
-      namespace: undefined as never,
-      snapshot: {
-        id: "fallback",
-        clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
-        collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
-        resourceCount: 0,
-        issueCount: 0
-      }
-    }),
+    fetchJson<BackendNamespaceDetailResponse>(
+      `/api/namespaces/${encodeURIComponent(name)}`,
+      {
+        namespace: undefined as never,
+        snapshot: {
+          id: "fallback",
+          clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
+          collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
+          resourceCount: 0,
+          issueCount: 0,
+        },
+      },
+    ),
     fetchJson<BackendSnapshotsResponse>("/api/snapshots", {
-      snapshots: []
-    })
+      snapshots: [],
+    }),
   ]);
 
   return {
@@ -226,14 +243,14 @@ export async function getNamespacePageData(name: string): Promise<{
       snapshotsResponse.snapshots.length > 0
         ? toClusterSnapshots(snapshotsResponse.snapshots)
         : sampleSnapshots,
-    degradedSources: []
+    degradedSources: [],
   };
 }
 
 export async function getResourceDetailPageData(
   kind: string,
   namespace: string,
-  name: string
+  name: string,
 ): Promise<{
   detail: ResourceDetail;
   degradedSources: string[];
@@ -252,9 +269,9 @@ export async function getResourceDetailPageData(
           clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
           collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
           resourceCount: 0,
-          issueCount: 0
-        }
-      }
+          issueCount: 0,
+        },
+      },
     ),
     fetchJson<BackendResourceRelationsResponse>(
       `/api/resources/${encodedKind}/${encodedNamespace}/${encodedName}/relations`,
@@ -265,30 +282,38 @@ export async function getResourceDetailPageData(
           clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
           collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
           resourceCount: 0,
-          issueCount: 0
-        }
-      }
-    )
+          issueCount: 0,
+        },
+      },
+    ),
   ]);
 
   if (!resourceResponse.resource) {
     return {
       detail: getSampleResourceDetail(kind, namespace, name),
-      degradedSources: sampleAnalysisResponse.degradedSources
+      degradedSources: sampleAnalysisResponse.degradedSources,
     };
   }
 
-  const detail = toResourceDetail(resourceResponse.resource, resourceResponse.snapshot.collectedAt);
+  const detail = toResourceDetail(
+    resourceResponse.resource,
+    resourceResponse.snapshot.collectedAt,
+  );
   const relations = relationsResponse.relations.map((relation) =>
-    toResourceRelation(relation, detail.resource.kind, detail.resource.namespace, detail.resource.name)
+    toResourceRelation(
+      relation,
+      detail.resource.kind,
+      detail.resource.namespace,
+      detail.resource.name,
+    ),
   );
 
   return {
     detail: {
       ...detail,
-      relations: relations.length > 0 ? relations : detail.relations
+      relations: relations.length > 0 ? relations : detail.relations,
     },
-    degradedSources: []
+    degradedSources: [],
   };
 }
 
@@ -297,18 +322,21 @@ export async function getHistoryPageData(): Promise<{
   degradedSources: string[];
 }> {
   const response = await fetchJson<BackendSnapshotsResponse>("/api/snapshots", {
-    snapshots: []
+    snapshots: [],
   });
 
   return {
-    snapshots: response.snapshots.length > 0 ? toClusterSnapshots(response.snapshots) : sampleSnapshots,
-    degradedSources: []
+    snapshots:
+      response.snapshots.length > 0
+        ? toClusterSnapshots(response.snapshots)
+        : sampleSnapshots,
+    degradedSources: [],
   };
 }
 
 export async function getSnapshotDiffPageData(
   snapshotId: string,
-  previousId: string
+  previousId: string,
 ): Promise<{
   diff: SnapshotDiff;
   snapshots: ClusterSnapshot[];
@@ -318,29 +346,41 @@ export async function getSnapshotDiffPageData(
     fetchJson<BackendSnapshotDiffResponse>(
       `/api/snapshots/${encodeURIComponent(snapshotId)}/diff/${encodeURIComponent(previousId)}`,
       {
-        diff: undefined as never
-      }
+        diff: undefined as never,
+      },
     ),
     fetchJson<BackendSnapshotsResponse>("/api/snapshots", {
-      snapshots: []
-    })
+      snapshots: [],
+    }),
   ]);
 
   return {
-    diff: diffResponse.diff ? toSnapshotDiff(diffResponse.diff) : getSampleSnapshotDiff(snapshotId, previousId),
-    snapshots: snapshotsResponse.snapshots.length > 0 ? toClusterSnapshots(snapshotsResponse.snapshots) : sampleSnapshots,
-    degradedSources: []
+    diff: diffResponse.diff
+      ? toSnapshotDiff(diffResponse.diff)
+      : getSampleSnapshotDiff(snapshotId, previousId),
+    snapshots:
+      snapshotsResponse.snapshots.length > 0
+        ? toClusterSnapshots(snapshotsResponse.snapshots)
+        : sampleSnapshots,
+    degradedSources: [],
   };
 }
 
-function toNamespaceInventory(namespace: BackendNamespaceInventory): NamespaceInventory {
+function toNamespaceInventory(
+  namespace: BackendNamespaceInventory,
+): NamespaceInventory {
   const resources = namespace.resources.map(toResourceSummary);
   const resourceCount = resources.length;
-  const unhealthyResourceCount = resources.filter((resource) => resource.health !== "healthy").length;
+  const unhealthyResourceCount = resources.filter(
+    (resource) => resource.health !== "healthy",
+  ).length;
 
   return {
     name: namespace.name,
-    status: namespace.health.unhealthyPodCount > 0 || namespace.topIssues.length > 0 ? "warning" : "healthy",
+    status:
+      namespace.health.unhealthyPodCount > 0 || namespace.topIssues.length > 0
+        ? "warning"
+        : "healthy",
     summary: `${namespace.health.podCount} pods, ${resourceCount} recursos e ${namespace.topIssues.length} issues contextualizadas.`,
     podCount: namespace.health.podCount,
     resourceCount,
@@ -349,17 +389,24 @@ function toNamespaceInventory(namespace: BackendNamespaceInventory): NamespaceIn
     cpuCores: namespace.health.cpuCores,
     memoryBytes: namespace.health.memoryBytes,
     kinds: Object.entries(namespace.resourceCounts)
-      .map(([kind, count]) => ({ kind: kind as ResourceKind, count: count ?? 0 }))
+      .map(([kind, count]) => ({
+        kind: kind as ResourceKind,
+        count: count ?? 0,
+      }))
       .sort((left, right) => left.kind.localeCompare(right.kind)),
     resources,
-    issues: namespace.topIssues
+    issues: namespace.topIssues,
   };
 }
 
-function toResourceSummary(resource: BackendNamespaceInventory["resources"][number]) {
+function toResourceSummary(
+  resource: BackendNamespaceInventory["resources"][number],
+) {
   const health = toResourceHealth(resource.status, resource.issueCount);
   const scope: "application" | "platform" =
-    resource.namespace && isPlatformNamespace(resource.namespace) ? "platform" : "application";
+    resource.namespace && isPlatformNamespace(resource.namespace)
+      ? "platform"
+      : "application";
 
   return {
     kind: resource.kind as ResourceKind,
@@ -374,14 +421,17 @@ function toResourceSummary(resource: BackendNamespaceInventory["resources"][numb
     cpuCores: resource.usage?.cpuCores,
     memoryBytes: resource.usage?.memoryBytes,
     labels: resource.labels,
-    scope
+    scope,
   };
 }
 
-function toResourceDetail(resource: BackendResourceDetail, collectedAt: string): ResourceDetail {
+function toResourceDetail(
+  resource: BackendResourceDetail,
+  collectedAt: string,
+): ResourceDetail {
   const summary = toResourceSummary(resource);
   const relations = resource.relations.map((relation) =>
-    toResourceRelation(relation, summary.kind, summary.namespace, summary.name)
+    toResourceRelation(relation, summary.kind, summary.namespace, summary.name),
   );
   const issues = resource.issues ?? [];
   const rollout = buildRollout(resource, summary, issues);
@@ -391,12 +441,12 @@ function toResourceDetail(resource: BackendResourceDetail, collectedAt: string):
     resource: {
       ...summary,
       createdAt: collectedAt,
-      nodeName: findNodeName(resource)
+      nodeName: findNodeName(resource),
     },
     metrics: {
       cpuCores: resource.metrics?.cpuCores,
       memoryBytes: resource.metrics?.memoryBytes,
-      restartCount: findRestartCount(resource)
+      restartCount: findRestartCount(resource),
     },
     issues,
     suggestedCommands: resource.suggestedCommands ?? [],
@@ -407,7 +457,7 @@ function toResourceDetail(resource: BackendResourceDetail, collectedAt: string):
       timestamp: entry.collectedAt,
       changeType: toFrontendChangeType(entry.changeType),
       title: entry.summary,
-      detail: entry.summary
+      detail: entry.summary,
     })),
     rollout,
     autoscaling: buildAutoscaling(resource, summary, relations, issues),
@@ -420,8 +470,8 @@ function toResourceDetail(resource: BackendResourceDetail, collectedAt: string):
     references: (resource.references ?? []).map((reference) => ({
       kind: reference.kind,
       name: reference.name,
-      namespace: reference.namespace ?? summary.namespace
-    }))
+      namespace: reference.namespace ?? summary.namespace,
+    })),
   };
 }
 
@@ -429,11 +479,17 @@ function toResourceRelation(
   relation: BackendResourceRelation,
   currentKind: ResourceKind,
   currentNamespace: string,
-  currentName: string
+  currentName: string,
 ): ResourceRelation {
-  const currentKey = buildBackendResourceKey(currentKind, currentName, currentNamespace);
+  const currentKey = buildBackendResourceKey(
+    currentKind,
+    currentName,
+    currentNamespace,
+  );
   const outgoing = relation.fromKey === currentKey;
-  const target = parseBackendResourceKey(outgoing ? relation.toKey : relation.fromKey);
+  const target = parseBackendResourceKey(
+    outgoing ? relation.toKey : relation.fromKey,
+  );
 
   return {
     type: relation.type,
@@ -441,16 +497,18 @@ function toResourceRelation(
     target: {
       kind: target.kind,
       namespace: target.namespace,
-      name: target.name
+      name: target.name,
     },
     title: `${relation.label}`,
     detail: outgoing
       ? `${currentKind} ${currentName} se conecta a ${target.kind} ${target.name}.`
-      : `${target.kind} ${target.name} se conecta a ${currentKind} ${currentName}.`
+      : `${target.kind} ${target.name} se conecta a ${currentKind} ${currentName}.`,
   };
 }
 
-function toClusterSnapshots(snapshots: BackendSnapshotSummary[]): ClusterSnapshot[] {
+function toClusterSnapshots(
+  snapshots: BackendSnapshotSummary[],
+): ClusterSnapshot[] {
   return snapshots.map((snapshot, index) => ({
     id: snapshot.id,
     clusterName: snapshot.clusterName,
@@ -458,7 +516,7 @@ function toClusterSnapshots(snapshots: BackendSnapshotSummary[]): ClusterSnapsho
     namespaceCount: 0,
     resourceCount: snapshot.resourceCount,
     issueCount: snapshot.issueCount,
-    changeCount: index === snapshots.length - 1 ? 0 : 1
+    changeCount: index === snapshots.length - 1 ? 0 : 1,
   }));
 }
 
@@ -466,7 +524,7 @@ function toSnapshotDiff(diff: BackendSnapshotDiff): SnapshotDiff {
   const changes = [
     ...diff.added.map((entry) => toSnapshotDiffChange("added", entry)),
     ...diff.removed.map((entry) => toSnapshotDiffChange("removed", entry)),
-    ...diff.changed.map((entry) => toSnapshotDiffChange("changed", entry))
+    ...diff.changed.map((entry) => toSnapshotDiffChange("changed", entry)),
   ];
 
   return {
@@ -476,13 +534,15 @@ function toSnapshotDiff(diff: BackendSnapshotDiff): SnapshotDiff {
     summary: {
       added: diff.added.length,
       removed: diff.removed.length,
-      changed: diff.changed.length
+      changed: diff.changed.length,
     },
-    changes
+    changes,
   };
 }
 
-function toDeploymentInventory(deployment: BackendDeploymentInventory): DeploymentInventory {
+function toDeploymentInventory(
+  deployment: BackendDeploymentInventory,
+): DeploymentInventory {
   return {
     key: deployment.key,
     name: deployment.name,
@@ -498,7 +558,7 @@ function toDeploymentInventory(deployment: BackendDeploymentInventory): Deployme
       ? {
           ...deployment.autoscaling,
           atMaxReplicas: deployment.autoscaling.atMaxReplicas ?? false,
-          conditions: deployment.autoscaling.conditions ?? []
+          conditions: deployment.autoscaling.conditions ?? [],
         }
       : undefined,
     exposure: deployment.exposure
@@ -509,61 +569,75 @@ function toDeploymentInventory(deployment: BackendDeploymentInventory): Deployme
             ports: service.ports ?? [],
             endpointSlices: service.endpointSlices.map((slice) => ({
               ...slice,
-              backingPods: slice.backingPods ?? []
-            }))
+              backingPods: slice.backingPods ?? [],
+            })),
           })),
           ingresses: deployment.exposure.ingresses.map((ingress) => ({
             ...ingress,
             namespace: ingress.namespace ?? deployment.namespace,
             hosts: ingress.hosts ?? [],
             tlsSecrets: ingress.tlsSecrets ?? [],
-            backendServices: ingress.backendServices ?? []
-          }))
+            backendServices: ingress.backendServices ?? [],
+          })),
         }
       : undefined,
     resilience: deployment.resilience
       ? {
           ...deployment.resilience,
-          podDisruptionBudgets: deployment.resilience.podDisruptionBudgets ?? [],
-          risks: deployment.resilience.risks ?? []
+          podDisruptionBudgets:
+            deployment.resilience.podDisruptionBudgets ?? [],
+          risks: deployment.resilience.risks ?? [],
         }
       : undefined,
     references: deployment.references ?? [],
     cleanupSignals: deployment.cleanupSignals ?? [],
     topIssues: deployment.topIssues ?? [],
-    suggestedCommands: deployment.suggestedCommands ?? []
+    suggestedCommands: deployment.suggestedCommands ?? [],
   };
 }
 
 function toSnapshotDiffChange(
   changeType: "added" | "removed" | "changed",
-  entry: BackendSnapshotDiff["added"][number]
+  entry: BackendSnapshotDiff["added"][number],
 ) {
   return {
     changeType,
     resource: {
       kind: entry.kind as ResourceKind,
       namespace: entry.namespace ?? "_cluster",
-      name: entry.name
+      name: entry.name,
     },
-    detail: entry.summary
+    detail: entry.summary,
   };
 }
 
 function toResourceHealth(status: string, issueCount: number): ResourceHealth {
   const normalized = status.toLowerCase();
-  if (normalized.includes("failed") || normalized.includes("degraded") || normalized.includes("notready")) {
+  if (
+    normalized.includes("failed") ||
+    normalized.includes("degraded") ||
+    normalized.includes("notready")
+  ) {
     return "critical";
   }
-  if (issueCount > 0 || normalized.includes("pending") || normalized.includes("unknown")) {
+  if (
+    issueCount > 0 ||
+    normalized.includes("pending") ||
+    normalized.includes("unknown")
+  ) {
     return "warning";
   }
   return "healthy";
 }
 
-function buildResourceSummary(resource: BackendNamespaceInventory["resources"][number]): string {
+function buildResourceSummary(
+  resource: BackendNamespaceInventory["resources"][number],
+): string {
   const parts = [resource.status];
-  if (resource.replicas?.ready !== undefined && resource.replicas?.desired !== undefined) {
+  if (
+    resource.replicas?.ready !== undefined &&
+    resource.replicas?.desired !== undefined
+  ) {
     parts.push(`ready ${resource.replicas.ready}/${resource.replicas.desired}`);
   }
   if (resource.usage?.cpuCores !== undefined) {
@@ -578,24 +652,26 @@ function buildResourceSummary(resource: BackendNamespaceInventory["resources"][n
 function buildRollout(
   resource: BackendResourceDetail,
   summary: ReturnType<typeof toResourceSummary>,
-  issues: Issue[]
+  issues: Issue[],
 ): ResourceRollout | undefined {
-  const rolloutIssues = issues.filter((issue) =>
-    issue.category === "rollout" || issue.category === "availability"
+  const rolloutIssues = issues.filter(
+    (issue) =>
+      issue.category === "rollout" || issue.category === "availability",
   );
-  const events = toFrontendEvents(resource.rollout?.events) ?? toIssueEvents(rolloutIssues);
+  const events =
+    toFrontendEvents(resource.rollout?.events) ?? toIssueEvents(rolloutIssues);
   const conditions =
     resource.rollout?.conditions?.map((condition) => ({
       type: condition.type,
       status: condition.status,
       reason: condition.reason,
-      message: condition.message
+      message: condition.message,
     })) ??
     rolloutIssues.map((issue) => ({
       type: issue.category,
       status: issue.severity,
       reason: issue.source,
-      message: issue.summary
+      message: issue.summary,
     }));
 
   const derived: ResourceRollout = {
@@ -611,10 +687,14 @@ function buildRollout(
     currentRevision: resource.rollout?.currentRevision,
     updatedRevision: resource.rollout?.updatedRevision,
     conditions,
-    events
+    events,
   };
 
-  if (!isWorkloadKind(summary.kind) && conditions.length === 0 && events.length === 0) {
+  if (
+    !isWorkloadKind(summary.kind) &&
+    conditions.length === 0 &&
+    events.length === 0
+  ) {
     return undefined;
   }
 
@@ -636,11 +716,13 @@ function buildAutoscaling(
   resource: BackendResourceDetail,
   summary: ReturnType<typeof toResourceSummary>,
   relations: ResourceRelation[],
-  issues: Issue[]
+  issues: Issue[],
 ): ResourceAutoscaling | undefined {
-  const autoscalingIssues = issues.filter((issue) => issue.category === "autoscaling");
+  const autoscalingIssues = issues.filter(
+    (issue) => issue.category === "autoscaling",
+  );
   const hpaRelation = relations.find(
-    (relation) => relation.target.kind === "HorizontalPodAutoscaler"
+    (relation) => relation.target.kind === "HorizontalPodAutoscaler",
   );
 
   if (resource.autoscaling) {
@@ -665,12 +747,16 @@ function buildAutoscaling(
           type: condition.type,
           status: condition.status,
           reason: condition.reason,
-          message: condition.message
-        })) ?? []
+          message: condition.message,
+        })) ?? [],
     };
   }
 
-  if (!isWorkloadKind(summary.kind) && !hpaRelation && autoscalingIssues.length === 0) {
+  if (
+    !isWorkloadKind(summary.kind) &&
+    !hpaRelation &&
+    autoscalingIssues.length === 0
+  ) {
     return undefined;
   }
 
@@ -688,15 +774,15 @@ function buildAutoscaling(
       type: issue.category,
       status: issue.severity,
       reason: issue.source,
-      message: issue.summary
-    }))
+      message: issue.summary,
+    })),
   };
 }
 
 function buildExposure(
   resource: BackendResourceDetail,
   summary: ReturnType<typeof toResourceSummary>,
-  relations: ResourceRelation[]
+  relations: ResourceRelation[],
 ): ResourceExposure | undefined {
   if (resource.exposure) {
     return {
@@ -712,8 +798,8 @@ function buildExposure(
           name: slice.name,
           readyEndpoints: slice.readyEndpoints,
           totalEndpoints: slice.totalEndpoints,
-          backingPods: slice.backingPods ?? []
-        }))
+          backingPods: slice.backingPods ?? [],
+        })),
       })),
       ingresses: (resource.exposure.ingresses ?? []).map((ingress) => ({
         name: ingress.name,
@@ -722,15 +808,19 @@ function buildExposure(
         hosts: ingress.hosts ?? [],
         tlsSecrets: ingress.tlsSecrets ?? [],
         backendServices: ingress.backendServices ?? [],
-        defaultBackendService: ingress.defaultBackendService
-      }))
+        defaultBackendService: ingress.defaultBackendService,
+      })),
     };
   }
 
-  const serviceRelations = relations.filter((relation) => relation.target.kind === "Service");
-  const ingressRelations = relations.filter((relation) => relation.target.kind === "Ingress");
+  const serviceRelations = relations.filter(
+    (relation) => relation.target.kind === "Service",
+  );
+  const ingressRelations = relations.filter(
+    (relation) => relation.target.kind === "Ingress",
+  );
   const endpointRelations = relations.filter(
-    (relation) => relation.target.kind === "EndpointSlice"
+    (relation) => relation.target.kind === "EndpointSlice",
   );
 
   const services = serviceRelations.map((relation, index) => ({
@@ -742,9 +832,9 @@ function buildExposure(
         ? endpointRelations.map((endpoint) => ({
             name: endpoint.target.name,
             readyEndpoints: 0,
-            totalEndpoints: 0
+            totalEndpoints: 0,
           }))
-        : []
+        : [],
   }));
 
   const ingresses = ingressRelations.map((relation) => ({
@@ -752,7 +842,7 @@ function buildExposure(
     namespace: relation.target.namespace,
     hosts: [],
     tlsSecrets: [],
-    backendServices: services.map((service) => service.name)
+    backendServices: services.map((service) => service.name),
   }));
 
   if (summary.kind === "Service" && services.length === 0) {
@@ -763,8 +853,8 @@ function buildExposure(
       endpointSlices: endpointRelations.map((endpoint) => ({
         name: endpoint.target.name,
         readyEndpoints: 0,
-        totalEndpoints: 0
-      }))
+        totalEndpoints: 0,
+      })),
     });
   }
 
@@ -774,7 +864,7 @@ function buildExposure(
       namespace: summary.namespace,
       hosts: [],
       tlsSecrets: [],
-      backendServices: services.map((service) => service.name)
+      backendServices: services.map((service) => service.name),
     });
   }
 
@@ -787,7 +877,7 @@ function buildExposure(
 
 function buildScheduling(
   resource: BackendResourceDetail,
-  relations: ResourceRelation[]
+  relations: ResourceRelation[],
 ): ResourceScheduling | undefined {
   if (resource.scheduling) {
     return {
@@ -796,11 +886,13 @@ function buildScheduling(
       nodeSelector: resource.scheduling.nodeSelector ?? [],
       tolerations: resource.scheduling.tolerations ?? [],
       affinitySummary: resource.scheduling.affinitySummary ?? [],
-      topologySpread: resource.scheduling.topologySpread ?? []
+      topologySpread: resource.scheduling.topologySpread ?? [],
     };
   }
 
-  const serviceAccount = relations.find((relation) => relation.target.kind === "ServiceAccount");
+  const serviceAccount = relations.find(
+    (relation) => relation.target.kind === "ServiceAccount",
+  );
   if (!serviceAccount) {
     return undefined;
   }
@@ -811,7 +903,7 @@ function buildScheduling(
     nodeSelector: [],
     tolerations: [],
     affinitySummary: [],
-    topologySpread: []
+    topologySpread: [],
   };
 }
 
@@ -819,34 +911,41 @@ function buildResilience(
   resource: BackendResourceDetail,
   summary: ReturnType<typeof toResourceSummary>,
   relations: ResourceRelation[],
-  issues: Issue[]
+  issues: Issue[],
 ): ResourceResilience | undefined {
   if (resource.resilience) {
     return {
       hasReadinessProbe: resource.resilience.hasReadinessProbe,
       hasLivenessProbe: resource.resilience.hasLivenessProbe,
       hasStartupProbe: resource.resilience.hasStartupProbe,
-      podDisruptionBudgets: (resource.resilience.podDisruptionBudgets ?? []).map((pdb) => ({
+      podDisruptionBudgets: (
+        resource.resilience.podDisruptionBudgets ?? []
+      ).map((pdb) => ({
         name: pdb.name,
         namespace: pdb.namespace ?? summary.namespace,
         minAvailable: pdb.minAvailable,
         maxUnavailable: pdb.maxUnavailable,
-        disruptionsAllowed: pdb.disruptionsAllowed
+        disruptionsAllowed: pdb.disruptionsAllowed,
       })),
       hasPodDisruptionBudget: resource.resilience.hasPodDisruptionBudget,
       hasAntiAffinity: resource.resilience.hasAntiAffinity,
-      risks: resource.resilience.risks ?? []
+      risks: resource.resilience.risks ?? [],
     };
   }
 
   const resilienceIssues = issues.filter(
-    (issue) => issue.category === "availability" || issue.category === "reliability"
+    (issue) =>
+      issue.category === "availability" || issue.category === "reliability",
   );
   const pdbRelations = relations.filter(
-    (relation) => relation.target.kind === "PodDisruptionBudget"
+    (relation) => relation.target.kind === "PodDisruptionBudget",
   );
 
-  if (!isWorkloadKind(summary.kind) && pdbRelations.length === 0 && resilienceIssues.length === 0) {
+  if (
+    !isWorkloadKind(summary.kind) &&
+    pdbRelations.length === 0 &&
+    resilienceIssues.length === 0
+  ) {
     return undefined;
   }
 
@@ -856,15 +955,18 @@ function buildResilience(
     hasStartupProbe: false,
     podDisruptionBudgets: pdbRelations.map((relation) => ({
       name: relation.target.name,
-      namespace: relation.target.namespace
+      namespace: relation.target.namespace,
     })),
     hasPodDisruptionBudget: pdbRelations.length > 0,
     hasAntiAffinity: false,
-    risks: resilienceIssues.map((issue) => issue.summary)
+    risks: resilienceIssues.map((issue) => issue.summary),
   };
 }
 
-function buildCleanupSignals(resource: BackendResourceDetail, issues: Issue[]): string[] | undefined {
+function buildCleanupSignals(
+  resource: BackendResourceDetail,
+  issues: Issue[],
+): string[] | undefined {
   const explicit = resource.cleanupSignals?.filter(Boolean) ?? [];
   const derived = issues
     .filter((issue) => issue.category === "cleanup")
@@ -878,7 +980,7 @@ function toFrontendEvents(
   events:
     | BackendResourceDetail["events"]
     | NonNullable<BackendResourceDetail["rollout"]>["events"]
-    | undefined
+    | undefined,
 ): ResourceEvent[] | undefined {
   if (!events || events.length === 0) {
     return undefined;
@@ -889,7 +991,7 @@ function toFrontendEvents(
     reason: event.reason,
     message: event.message,
     count: event.count,
-    lastSeen: event.lastSeen
+    lastSeen: event.lastSeen,
   }));
 }
 
@@ -898,7 +1000,7 @@ function toIssueEvents(issues: Issue[]): ResourceEvent[] {
     type: issue.category,
     reason: issue.title,
     message: issue.summary,
-    lastSeen: issue.detectedAt
+    lastSeen: issue.detectedAt,
   }));
 }
 
@@ -934,14 +1036,18 @@ function findNodeName(resource: BackendResourceDetail): string | undefined {
   return parseBackendResourceKey(relation.toKey).name;
 }
 
-function toFrontendChangeType(changeType: "added" | "removed" | "status_changed" | "spec_changed") {
+function toFrontendChangeType(
+  changeType: "added" | "removed" | "status_changed" | "spec_changed",
+) {
   if (changeType === "status_changed") {
     return "status" as const;
   }
   if (changeType === "spec_changed") {
     return "spec" as const;
   }
-  return changeType === "added" ? ("appeared" as const) : ("disappeared" as const);
+  return changeType === "added"
+    ? ("appeared" as const)
+    : ("disappeared" as const);
 }
 
 function parseBackendResourceKey(key: string): {
@@ -954,7 +1060,7 @@ function parseBackendResourceKey(key: string): {
     return {
       kind: kind as ResourceKind,
       namespace: "_cluster",
-      name: key
+      name: key,
     };
   }
 
@@ -963,21 +1069,31 @@ function parseBackendResourceKey(key: string): {
     return {
       kind: kind as ResourceKind,
       namespace: "_cluster",
-      name: remainder
+      name: remainder,
     };
   }
 
   return {
     kind: kind as ResourceKind,
     namespace: remainder.slice(0, slashIndex),
-    name: remainder.slice(slashIndex + 1)
+    name: remainder.slice(slashIndex + 1),
   };
 }
 
-function buildBackendResourceKey(kind: string, name: string, namespace?: string): string {
-  return namespace && namespace !== "_cluster" ? `${kind}:${namespace}/${name}` : `${kind}:${name}`;
+function buildBackendResourceKey(
+  kind: string,
+  name: string,
+  namespace?: string,
+): string {
+  return namespace && namespace !== "_cluster"
+    ? `${kind}:${namespace}/${name}`
+    : `${kind}:${name}`;
 }
 
 function isPlatformNamespace(namespace: string): boolean {
-  return namespace.startsWith("kube-") || namespace === "monitoring" || namespace === "ingress-nginx";
+  return (
+    namespace.startsWith("kube-") ||
+    namespace === "monitoring" ||
+    namespace === "ingress-nginx"
+  );
 }

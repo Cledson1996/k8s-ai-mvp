@@ -7,11 +7,20 @@ import clsx from "clsx";
 const navigation = [
   { href: "/", label: "Overview", caption: "Saude geral" },
   { href: "/explorer", label: "Explorer", caption: "Namespaces e recursos" },
-  { href: "/deployments", label: "Deployments", caption: "Apps, rede e dependencias" },
+  {
+    href: "/deployments",
+    label: "Deployments",
+    caption: "Apps, rede e dependencias",
+  },
+  {
+    href: "/workloads",
+    label: "Workloads",
+    caption: "Pods, controllers e status",
+  },
   { href: "/nodes", label: "Nodes", caption: "Capacidade e pressao" },
   { href: "/issues", label: "Issues", caption: "Diagnosticos e playbooks" },
   { href: "/history", label: "History", caption: "Snapshots e diff" },
-  { href: "/chat", label: "Chat", caption: "Pergunte ao cluster" }
+  { href: "/chat", label: "Chat", caption: "Pergunte ao cluster" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -39,18 +48,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.28em] text-white/60">
                 Runtime
               </p>
-              <p className="mt-2 text-lg font-semibold">Local + VPN + Read-only</p>
+              <p className="mt-2 text-lg font-semibold">
+                Local + VPN + Read-only
+              </p>
               <p className="mt-1 text-sm text-white/70">
                 Web e API fora do cluster, com observabilidade guiada por IA.
               </p>
             </div>
           </div>
 
-          <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+          <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
             {navigation.map((item) => {
-              const active = item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+              const active =
+                item.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(item.href);
 
               return (
                 <Link
@@ -60,7 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     "rounded-2xl border px-4 py-4 transition",
                     active
                       ? "border-tide bg-tide text-white shadow-lg shadow-tide/20"
-                      : "border-black/5 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:border-ember/40 hover:bg-orange-50"
+                      : "border-black/5 bg-white/70 text-slate-700 hover:-translate-y-0.5 hover:border-ember/40 hover:bg-orange-50",
                   )}
                 >
                   <div className="font-[var(--font-heading)] text-lg font-semibold">
@@ -69,7 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div
                     className={clsx(
                       "mt-1 text-sm",
-                      active ? "text-white/80" : "text-slate-500"
+                      active ? "text-white/80" : "text-slate-500",
                     )}
                   >
                     {item.caption}
