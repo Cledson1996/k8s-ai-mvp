@@ -155,7 +155,7 @@ export class LiveAnalysisService implements AnalysisService {
   }
 
   private async getStoredSnapshot(): Promise<StoredSnapshot> {
-    if (this.latestStoredSnapshot && !needsSnapshotRefresh(this.latestStoredSnapshot)) {
+    if (this.latestStoredSnapshot) {
       return this.latestStoredSnapshot;
     }
 
@@ -173,18 +173,19 @@ export class LiveAnalysisService implements AnalysisService {
   }
 
   private async collectAndAnalyze(): Promise<AnalysisResult> {
-    const inventory = await this.kubernetes.collectInventory();
     const degradedSources: string[] = [];
-
-    const metrics = await this.prometheus.collectMetrics().catch((error: unknown) => {
+    const inventoryPromise = this.kubernetes.collectInventory();
+    const metricsPromise = this.prometheus.collectMetrics().catch((error: unknown) => {
       degradedSources.push(`prometheus: ${toErrorMessage(error)}`);
       return emptyMetrics();
     });
-
-    const k8sGptFindings = await this.k8sgpt.analyze().catch((error: unknown) => {
+    const k8sGptPromise = this.k8sgpt.analyze().catch((error: unknown) => {
       degradedSources.push(`k8sgpt: ${toErrorMessage(error)}`);
       return [];
     });
+
+    const inventory = await inventoryPromise;
+    const [metrics, k8sGptFindings] = await Promise.all([metricsPromise, k8sGptPromise]);
 
     const builtSnapshot = buildClusterSnapshot({
       inventory,
@@ -257,12 +258,17 @@ function needsSnapshotRefresh(stored: StoredSnapshot): boolean {
     stored.snapshot.resources?.filter((resource) => resource.kind === "Deployment").length ?? 0;
   const deploymentInventoryCount = stored.snapshot.deployments?.length ?? 0;
   const hasNodeWorkloads = stored.snapshot.nodes.every((node) => Array.isArray(node.workloads));
+  const hasDegradedSources = (stored.snapshot.degradedSources?.length ?? 0) > 0;
 
   if (deploymentResources > 0 && deploymentInventoryCount === 0) {
     return true;
   }
 
   if (!hasNodeWorkloads) {
+    return true;
+  }
+
+  if (hasDegradedSources) {
     return true;
   }
 

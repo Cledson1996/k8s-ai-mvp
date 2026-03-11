@@ -36,7 +36,6 @@ import type {
 } from "./explorer-types";
 import {
   getSampleNamespace,
-  sampleDeploymentInventories,
   getSampleResourceDetail,
   getSampleSnapshotDiff,
   sampleAnalysisResponse,
@@ -98,8 +97,8 @@ export async function getNodesPageData(): Promise<{
   degradedSources: string[];
 }> {
   const response = await fetchJson<NodesResponse>("/api/nodes", {
-    nodes: sampleAnalysisResponse.snapshot.nodes,
-    degradedSources: sampleAnalysisResponse.degradedSources
+    nodes: [],
+    degradedSources: ["api unavailable"]
   });
 
   return {
@@ -115,20 +114,17 @@ export async function getDeploymentsPageData(): Promise<{
   const response = await fetchJson<BackendDeploymentsResponse>("/api/deployments", {
     deployments: [],
     snapshot: {
-      id: "fallback",
-      clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
-      collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
+      id: "unavailable",
+      clusterName: "unknown",
+      collectedAt: new Date(0).toISOString(),
       resourceCount: 0,
       issueCount: 0
     },
-    degradedSources: sampleAnalysisResponse.degradedSources
+    degradedSources: ["api unavailable"]
   });
 
   return {
-    deployments:
-      response.deployments.length > 0
-        ? response.deployments.map(toDeploymentInventory)
-        : sampleDeploymentInventories,
+    deployments: response.deployments.map(toDeploymentInventory),
     degradedSources: response.degradedSources
   };
 }

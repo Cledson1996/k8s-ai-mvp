@@ -115,11 +115,17 @@ export function DeploymentsScreen({
           </label>
         </div>
 
-        <div className="space-y-4">
-          {filteredDeployments.map((deployment) => (
-            <DeploymentCard key={deployment.key} deployment={deployment} />
-          ))}
-        </div>
+        {filteredDeployments.length > 0 ? (
+          <div className="space-y-4">
+            {filteredDeployments.map((deployment) => (
+              <DeploymentCard key={deployment.key} deployment={deployment} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-dashed border-black/10 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+            Nenhum deployment foi carregado nesta coleta. Se a API acabou de reiniciar ou esta atualizando o snapshot, aguarde alguns segundos e atualize a pagina.
+          </div>
+        )}
       </SectionCard>
     </div>
   );

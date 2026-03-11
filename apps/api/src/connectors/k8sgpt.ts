@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import type { AppConfig } from "../config.js";
 
 const execFileAsync = promisify(execFile);
+const K8SGPT_TIMEOUT_MS = 60000;
 
 export interface K8sGptFinding {
   name: string;
@@ -28,7 +29,8 @@ export class LiveK8sGptConnector implements K8sGptConnector {
       ["analyze", "--output", "json"],
       {
         env,
-        maxBuffer: 10 * 1024 * 1024
+        maxBuffer: 10 * 1024 * 1024,
+        timeout: K8SGPT_TIMEOUT_MS
       }
     );
     const parsed = JSON.parse(stdout) as { results?: unknown[] } | unknown[];

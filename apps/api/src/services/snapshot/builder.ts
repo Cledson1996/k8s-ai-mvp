@@ -1921,6 +1921,30 @@ function toDeploymentHealth(deployment: V1Deployment, issues: Issue[]) {
   return "unknown" as const;
 }
 
+function hasDeploymentRolloutIssue(deployment: V1Deployment) {
+  const desiredReplicas = deployment.spec?.replicas ?? 1;
+  const readyReplicas = deployment.status?.readyReplicas ?? 0;
+  const unavailableReplicas = deployment.status?.unavailableReplicas ?? Math.max(desiredReplicas - readyReplicas, 0);
+  const progressingCondition = deployment.status?.conditions?.find((condition) => condition.type === "Progressing");
+
+  if (readyReplicas < desiredReplicas) {
+    return true;
+  }
+
+  if (unavailableReplicas > 0) {
+    return true;
+  }
+
+  if (
+    progressingCondition?.status === "False" &&
+    progressingCondition.reason === "ProgressDeadlineExceeded"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function getUpdatedReplicas(workload: V1Deployment | V1StatefulSet | V1DaemonSet) {
   return (workload.status as { updatedReplicas?: number } | undefined)?.updatedReplicas;
 }

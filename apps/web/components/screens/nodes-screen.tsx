@@ -30,11 +30,17 @@ export function NodesScreen({
         title="Capacidade total, consumo e distribuicao por node"
         description="Leitura operacional por node para localizar gargalos de CPU, memoria, armazenamento e concentracao de workloads."
       >
-        <div className="space-y-4">
-          {nodes.map((node) => (
-            <NodeCard key={node.name} node={node} />
-          ))}
-        </div>
+        {nodes.length > 0 ? (
+          <div className="space-y-4">
+            {nodes.map((node) => (
+              <NodeCard key={node.name} node={node} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-dashed border-black/10 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+            Nenhum node foi carregado desta coleta. Se a API acabou de reiniciar, atualize a pagina apos alguns segundos.
+          </div>
+        )}
       </SectionCard>
     </div>
   );
