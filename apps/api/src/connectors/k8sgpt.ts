@@ -40,17 +40,30 @@ export class LiveK8sGptConnector implements K8sGptConnector {
       }
 
       const item = entry as Record<string, unknown>;
+      const rawName = String(item.name ?? item.resource ?? "unknown");
+      const [nameNamespace, nameOnly] = rawName.includes("/")
+        ? rawName.split("/", 2)
+        : [undefined, rawName];
+      const firstError = Array.isArray(item.error) ? item.error[0] : undefined;
+      const detailFromError =
+        firstError && typeof firstError === "object" && "Text" in firstError
+          ? String((firstError as { Text?: unknown }).Text ?? "")
+          : undefined;
+
       return [
         {
-          name: String(item.name ?? item.resource ?? "unknown"),
+          name: nameOnly,
           kind: typeof item.kind === "string" ? item.kind : undefined,
-          namespace: typeof item.namespace === "string" ? item.namespace : undefined,
+          namespace:
+            typeof item.namespace === "string"
+              ? item.namespace
+              : nameNamespace,
           details:
             typeof item.details === "string"
-              ? item.details
+              ? item.details || detailFromError
               : typeof item.message === "string"
                 ? item.message
-                : undefined
+                : detailFromError
         }
       ];
     });

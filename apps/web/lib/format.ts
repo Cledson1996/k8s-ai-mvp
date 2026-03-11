@@ -35,3 +35,19 @@ export function formatRelativeTimestamp(value: string) {
     timeStyle: "short"
   }).format(date);
 }
+
+export function formatKindLabel(value: string) {
+  return value.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+export function formatCount(value: number, singular: string, plural = `${singular}s`) {
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
+export function formatPercent(value?: number) {
+  if (value === undefined) {
+    return "--";
+  }
+
+  return `${value.toFixed(0)}%`;
+}

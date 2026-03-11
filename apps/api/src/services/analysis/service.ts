@@ -1,39 +1,60 @@
 import type {
   AnalysisRunResponse,
-  AnalysisSnapshot,
-  ClusterOverview,
-  NamespaceHealth,
-  NodeHealth,
-  PodHealth,
-  WorkloadSummary
+  DeploymentsResponse,
+  NamespaceDetailResponse,
+  NamespacesResponse,
+  ResourceDetailResponse,
+  ResourceKind,
+  ResourceRelationsResponse,
+  SnapshotDiffResponse,
+  SnapshotsResponse,
+  SnapshotSummary
 } from "@k8s-ai-mvp/shared";
-import type { V1Node, V1Pod } from "@kubernetes/client-node";
-import type { ClusterInventory, KubernetesConnector } from "../../connectors/kubernetes.js";
+import type { KubernetesConnector } from "../../connectors/kubernetes.js";
 import type { K8sGptConnector } from "../../connectors/k8sgpt.js";
-import type { PrometheusConnector, PrometheusMetrics } from "../../connectors/prometheus.js";
-import { getPodOwner, getPodPrimaryReason, getPodRestartCount } from "../../lib/helpers.js";
-import { parseCpu, parseMemory } from "../../lib/quantity.js";
-import { buildRuleIssues, workloadKeyForPod } from "./rules.js";
+import type { PrometheusConnector } from "../../connectors/prometheus.js";
+import { buildClusterSnapshot } from "../snapshot/builder.js";
+import { SnapshotRepository, type StoredSnapshot } from "../snapshot/repository.js";
 
 export interface AnalysisResult extends AnalysisRunResponse {}
 
 export interface AnalysisService {
   getLatestOrRun(): Promise<AnalysisResult>;
   runAnalysis(): Promise<AnalysisResult>;
+  listNamespaces(): Promise<NamespacesResponse>;
+  getNamespace(name: string): Promise<NamespaceDetailResponse | undefined>;
+  getResourceDetail(kind: ResourceKind, namespace: string | undefined, name: string): Promise<ResourceDetailResponse | undefined>;
+  getResourceRelations(kind: ResourceKind, namespace: string | undefined, name: string): Promise<ResourceRelationsResponse | undefined>;
+  listDeployments(): Promise<DeploymentsResponse>;
+  listSnapshots(): Promise<SnapshotsResponse>;
+  getSnapshotDiff(snapshotId: string, previousSnapshotId: string): Promise<SnapshotDiffResponse | undefined>;
 }
 
 export class LiveAnalysisService implements AnalysisService {
   private latestResult?: AnalysisResult;
+  private latestStoredSnapshot?: StoredSnapshot;
   private inFlight?: Promise<AnalysisResult>;
 
   constructor(
     private readonly kubernetes: KubernetesConnector,
     private readonly prometheus: PrometheusConnector,
-    private readonly k8sgpt: K8sGptConnector
+    private readonly k8sgpt: K8sGptConnector,
+    private readonly repository: SnapshotRepository
   ) {}
 
   async getLatestOrRun(): Promise<AnalysisResult> {
-    return this.latestResult ?? this.runAnalysis();
+    if (this.latestResult) {
+      return this.latestResult;
+    }
+
+    const stored = this.repository.getLatest();
+    if (stored && !needsSnapshotRefresh(stored)) {
+      this.latestStoredSnapshot = stored;
+      this.latestResult = toAnalysisResult(stored);
+      return this.latestResult;
+    }
+
+    return this.runAnalysis();
   }
 
   async runAnalysis(): Promise<AnalysisResult> {
@@ -47,6 +68,108 @@ export class LiveAnalysisService implements AnalysisService {
 
     this.latestResult = await this.inFlight;
     return this.latestResult;
+  }
+
+  async listNamespaces(): Promise<NamespacesResponse> {
+    const stored = await this.getStoredSnapshot();
+    return {
+      namespaces: stored.snapshot.namespaces,
+      snapshot: toSnapshotSummary(stored.snapshot),
+      degradedSources: stored.snapshot.degradedSources
+    };
+  }
+
+  async getNamespace(name: string): Promise<NamespaceDetailResponse | undefined> {
+    const stored = await this.getStoredSnapshot();
+    const namespace = stored.snapshot.namespaces.find((item) => item.name === name);
+    if (!namespace) {
+      return undefined;
+    }
+
+    return {
+      namespace,
+      snapshot: toSnapshotSummary(stored.snapshot)
+    };
+  }
+
+  async getResourceDetail(
+    kind: ResourceKind,
+    namespace: string | undefined,
+    name: string
+  ): Promise<ResourceDetailResponse | undefined> {
+    const stored = await this.getStoredSnapshot();
+    const key = resourceKey(kind, name, namespace);
+    const resource = stored.detailsByKey[key];
+    if (!resource) {
+      return undefined;
+    }
+
+    return {
+      resource: {
+        ...resource,
+        relations: stored.snapshot.relations.filter((relation) => relation.fromKey === key || relation.toKey === key),
+        history: this.repository.listResourceHistory(key)
+      },
+      snapshot: toSnapshotSummary(stored.snapshot)
+    };
+  }
+
+  async getResourceRelations(
+    kind: ResourceKind,
+    namespace: string | undefined,
+    name: string
+  ): Promise<ResourceRelationsResponse | undefined> {
+    const stored = await this.getStoredSnapshot();
+    const key = resourceKey(kind, name, namespace);
+    const resource = stored.detailsByKey[key];
+    if (!resource) {
+      return undefined;
+    }
+
+    return {
+      relations: stored.snapshot.relations.filter((relation) => relation.fromKey === key || relation.toKey === key),
+      snapshot: toSnapshotSummary(stored.snapshot)
+    };
+  }
+
+  async listDeployments(): Promise<DeploymentsResponse> {
+    const stored = await this.getStoredSnapshot();
+    return {
+      deployments: stored.snapshot.deployments ?? [],
+      snapshot: toSnapshotSummary(stored.snapshot),
+      degradedSources: stored.snapshot.degradedSources
+    };
+  }
+
+  async listSnapshots(): Promise<SnapshotsResponse> {
+    await this.getStoredSnapshot();
+    return {
+      snapshots: this.repository.listSnapshots()
+    };
+  }
+
+  async getSnapshotDiff(snapshotId: string, previousSnapshotId: string): Promise<SnapshotDiffResponse | undefined> {
+    await this.getStoredSnapshot();
+    const diff = this.repository.diffSnapshots(snapshotId, previousSnapshotId);
+    return diff ? { diff } : undefined;
+  }
+
+  private async getStoredSnapshot(): Promise<StoredSnapshot> {
+    if (this.latestStoredSnapshot && !needsSnapshotRefresh(this.latestStoredSnapshot)) {
+      return this.latestStoredSnapshot;
+    }
+
+    const stored = this.repository.getLatest();
+    if (stored && !needsSnapshotRefresh(stored)) {
+      this.latestStoredSnapshot = stored;
+      return stored;
+    }
+
+    await this.runAnalysis();
+    if (!this.latestStoredSnapshot) {
+      throw new Error("snapshot unavailable after analysis");
+    }
+    return this.latestStoredSnapshot;
   }
 
   private async collectAndAnalyze(): Promise<AnalysisResult> {
@@ -63,185 +186,33 @@ export class LiveAnalysisService implements AnalysisService {
       return [];
     });
 
-    const pods = inventory.pods.map((pod) => mapPodHealth(pod, metrics));
-    const workloadUsage = buildWorkloadUsage(inventory.pods, metrics);
-    const nodes = inventory.nodes.map((node) => mapNodeHealth(node, inventory.pods, workloadUsage, metrics));
-    const namespaces = buildNamespaceHealth(inventory, pods, metrics);
-    const issues = buildRuleIssues({
-      collectedAt: inventory.collectedAt,
-      pods,
-      nodes,
-      namespaces,
-      deployments: inventory.deployments,
-      rawPods: inventory.pods,
-      workloadUsage,
-      k8sGptFindings
+    const builtSnapshot = buildClusterSnapshot({
+      inventory,
+      metrics,
+      k8sGptFindings,
+      degradedSources
     });
 
+    const stored = this.repository.save({
+      snapshot: builtSnapshot.clusterSnapshot,
+      detailsByKey: builtSnapshot.detailsByKey
+    });
+
+    this.latestStoredSnapshot = stored;
+
     return {
-      snapshot: {
-        overview: buildOverview(inventory, namespaces, pods, issues, metrics),
-        nodes,
-        namespaces,
-        pods,
-        issues
-      },
-      degradedSources
+      snapshot: builtSnapshot.analysisSnapshot,
+      clusterSnapshot: stored.snapshot,
+      degradedSources: stored.snapshot.degradedSources
     };
   }
 }
 
-function mapPodHealth(pod: V1Pod, metrics: PrometheusMetrics): PodHealth {
-  const namespace = pod.metadata?.namespace ?? "default";
-  const name = pod.metadata?.name ?? "unknown";
-  const key = `${namespace}/${name}`;
-  const statuses = pod.status?.containerStatuses ?? [];
-
-  return {
-    name,
-    namespace,
-    phase: pod.status?.phase ?? "Unknown",
-    nodeName: pod.spec?.nodeName,
-    restarts: getPodRestartCount(pod),
-    ready: statuses.length > 0 && statuses.every((status) => status.ready),
-    reason: getPodPrimaryReason(statuses),
-    cpuCores: metrics.podCpu[key],
-    memoryBytes: metrics.podMemory[key],
-    missingResources: (pod.spec?.containers ?? []).some((container) => {
-      const requests = container.resources?.requests;
-      const limits = container.resources?.limits;
-      return !requests?.cpu || !requests.memory || !limits?.cpu || !limits.memory;
-    })
-  };
-}
-
-function mapNodeHealth(
-  node: V1Node,
-  pods: V1Pod[],
-  workloadUsage: Map<string, WorkloadSummary>,
-  metrics: PrometheusMetrics
-): NodeHealth {
-  const name = node.metadata?.name ?? "unknown";
-  const allocatableCpu = parseCpu(node.status?.allocatable?.cpu?.toString());
-  const allocatableMemory = parseMemory(node.status?.allocatable?.memory?.toString());
-  const cpuUsage = metrics.nodeCpu[name];
-  const memoryUsage = metrics.nodeMemory[name];
-  const nodePods = pods.filter((pod) => pod.spec?.nodeName === name);
-
-  const topWorkloads = Array.from(
-    new Map(
-      nodePods
-        .map((pod) => workloadKeyForPod(pod))
-        .filter((value): value is string => Boolean(value))
-        .map((key) => [key, workloadUsage.get(key)])
-        .filter((entry): entry is [string, WorkloadSummary] => Boolean(entry[1]))
-    ).values()
-  )
-    .sort((left, right) => (right.cpuCores ?? 0) - (left.cpuCores ?? 0))
-    .slice(0, 3);
-
-  return {
-    name,
-    status: node.status?.conditions?.find((condition) => condition.type === "Ready")?.status === "True" ? "Ready" : "NotReady",
-    roles: Object.keys(node.metadata?.labels ?? {})
-      .filter((label) => label.startsWith("node-role.kubernetes.io/"))
-      .map((label) => label.replace("node-role.kubernetes.io/", "")),
-    taints: (node.spec?.taints ?? []).map((taint) => `${taint.key}${taint.effect ? `:${taint.effect}` : ""}`),
-    usage: {
-      cpuCores: cpuUsage,
-      cpuPercent: allocatableCpu ? (cpuUsage / allocatableCpu) * 100 : undefined,
-      memoryBytes: memoryUsage,
-      memoryPercent: allocatableMemory ? (memoryUsage / allocatableMemory) * 100 : undefined
-    },
-    pressure: (node.status?.conditions ?? [])
-      .filter((condition) => condition.status === "True" && condition.type !== "Ready")
-      .map((condition) => condition.type),
-    podCount: nodePods.length,
-    topWorkloads
-  };
-}
-
-function buildNamespaceHealth(
-  inventory: ClusterInventory,
-  pods: PodHealth[],
-  metrics: PrometheusMetrics
-): NamespaceHealth[] {
-  return inventory.namespaces
-    .map((namespace) => {
-      const name = namespace.metadata?.name ?? "default";
-      const namespacePods = pods.filter((pod) => pod.namespace === name);
-      return {
-        name,
-        podCount: namespacePods.length,
-        unhealthyPodCount: namespacePods.filter((pod) => pod.phase !== "Running" || !pod.ready).length,
-        restartCount: namespacePods.reduce((total, pod) => total + pod.restarts, 0),
-        cpuCores: metrics.namespaceCpu[name],
-        memoryBytes: metrics.namespaceMemory[name]
-      };
-    })
-    .sort((left, right) => (right.memoryBytes ?? 0) - (left.memoryBytes ?? 0));
-}
-
-function buildWorkloadUsage(pods: V1Pod[], metrics: PrometheusMetrics): Map<string, WorkloadSummary> {
-  const map = new Map<string, WorkloadSummary>();
-
-  for (const pod of pods) {
-    const owner = getPodOwner(pod);
-    const namespace = pod.metadata?.namespace ?? "default";
-    const key = owner ? `${namespace}/${owner.name}` : `${namespace}/${pod.metadata?.name ?? "pod"}`;
-    const podKey = `${namespace}/${pod.metadata?.name ?? "unknown"}`;
-    const current = map.get(key) ?? {
-      kind: owner?.kind ?? "Pod",
-      name: owner?.name ?? pod.metadata?.name ?? "unknown",
-      namespace,
-      replicas: 0,
-      readyReplicas: 0,
-      cpuCores: 0,
-      memoryBytes: 0
-    };
-
-    current.replicas = (current.replicas ?? 0) + 1;
-    if ((pod.status?.containerStatuses ?? []).every((status) => status.ready)) {
-      current.readyReplicas = (current.readyReplicas ?? 0) + 1;
-    }
-    current.cpuCores = (current.cpuCores ?? 0) + (metrics.podCpu[podKey] ?? 0);
-    current.memoryBytes = (current.memoryBytes ?? 0) + (metrics.podMemory[podKey] ?? 0);
-
-    map.set(key, current);
-  }
-
-  return map;
-}
-
-function buildOverview(
-  inventory: ClusterInventory,
-  namespaces: NamespaceHealth[],
-  pods: PodHealth[],
-  issues: AnalysisSnapshot["issues"],
-  metrics: PrometheusMetrics
-): ClusterOverview {
-  return {
-    clusterName: inventory.clusterName,
-    collectedAt: inventory.collectedAt,
-    nodeCount: inventory.nodes.length,
-    namespaceCount: inventory.namespaces.length,
-    podCount: inventory.pods.length,
-    unhealthyPodCount: pods.filter((pod) => pod.phase !== "Running" || !pod.ready).length,
-    totalRestarts: pods.reduce((total, pod) => total + pod.restarts, 0),
-    usage: {
-      cpuCores: metrics.clusterCpuCores,
-      memoryBytes: metrics.clusterMemoryBytes
-    },
-    topNamespaces: namespaces.slice(0, 5),
-    topRestarts: [...pods].sort((left, right) => right.restarts - left.restarts).slice(0, 5),
-    highlightedIssues: issues.slice(0, 5)
-  };
-}
-
-function emptyMetrics(): PrometheusMetrics {
+function emptyMetrics() {
   return {
     nodeCpu: {},
     nodeMemory: {},
+    nodeStorage: {},
     namespaceCpu: {},
     namespaceMemory: {},
     podCpu: {},
@@ -251,4 +222,49 @@ function emptyMetrics(): PrometheusMetrics {
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "unexpected error";
+}
+
+function toAnalysisResult(stored: StoredSnapshot): AnalysisResult {
+  return {
+    snapshot: {
+      overview: stored.snapshot.overview,
+      nodes: stored.snapshot.nodes,
+      namespaces: stored.snapshot.namespaces.map((namespace) => namespace.health),
+      pods: stored.snapshot.pods,
+      issues: stored.snapshot.issues
+    },
+    clusterSnapshot: stored.snapshot,
+    degradedSources: stored.snapshot.degradedSources
+  };
+}
+
+function toSnapshotSummary(snapshot: StoredSnapshot["snapshot"]): SnapshotSummary {
+  return {
+    id: snapshot.id,
+    clusterName: snapshot.clusterName,
+    collectedAt: snapshot.collectedAt,
+    resourceCount: snapshot.resources.length,
+    issueCount: snapshot.issues.length
+  };
+}
+
+function resourceKey(kind: ResourceKind, name: string, namespace?: string): string {
+  return namespace ? `${kind}:${namespace}/${name}` : `${kind}:${name}`;
+}
+
+function needsSnapshotRefresh(stored: StoredSnapshot): boolean {
+  const deploymentResources =
+    stored.snapshot.resources?.filter((resource) => resource.kind === "Deployment").length ?? 0;
+  const deploymentInventoryCount = stored.snapshot.deployments?.length ?? 0;
+  const hasNodeWorkloads = stored.snapshot.nodes.every((node) => Array.isArray(node.workloads));
+
+  if (deploymentResources > 0 && deploymentInventoryCount === 0) {
+    return true;
+  }
+
+  if (!hasNodeWorkloads) {
+    return true;
+  }
+
+  return false;
 }

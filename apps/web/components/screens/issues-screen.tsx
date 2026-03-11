@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { AnalysisSource, Issue, Severity } from "@k8s-ai-mvp/shared";
+import type { AnalysisSource, Issue, IssueCategory, Severity } from "@k8s-ai-mvp/shared";
 import { SectionCard } from "../ui/section-card";
 import { SeverityPill, SourcePill } from "../ui/status-pill";
 import { StateBanner } from "../ui/state-banner";
@@ -15,15 +15,31 @@ export function IssuesScreen({
 }) {
   const [severityFilter, setSeverityFilter] = useState<Severity | "all">("all");
   const [sourceFilter, setSourceFilter] = useState<AnalysisSource | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<IssueCategory | "all">("all");
+  const [namespaceQuery, setNamespaceQuery] = useState("");
+
+  const categoryCounts = useMemo(() => {
+    return issues.reduce<Record<string, number>>((accumulator, issue) => {
+      accumulator[issue.category] = (accumulator[issue.category] ?? 0) + 1;
+      return accumulator;
+    }, {});
+  }, [issues]);
 
   const filteredIssues = useMemo(() => {
+    const normalizedNamespace = namespaceQuery.trim().toLowerCase();
+
     return issues.filter((issue) => {
       const severityMatches =
         severityFilter === "all" || issue.severity === severityFilter;
       const sourceMatches = sourceFilter === "all" || issue.source === sourceFilter;
-      return severityMatches && sourceMatches;
+      const categoryMatches =
+        categoryFilter === "all" || issue.category === categoryFilter;
+      const namespaceMatches =
+        !normalizedNamespace ||
+        (issue.resourceRef?.namespace ?? "cluster").toLowerCase().includes(normalizedNamespace);
+      return severityMatches && sourceMatches && categoryMatches && namespaceMatches;
     });
-  }, [issues, severityFilter, sourceFilter]);
+  }, [issues, severityFilter, sourceFilter, categoryFilter, namespaceQuery]);
 
   return (
     <div className="space-y-6">
@@ -40,7 +56,7 @@ export function IssuesScreen({
         title="Achados consolidados"
         description="Diagnosticos combinados entre regras proprias, Prometheus e K8sGPT."
       >
-        <div className="mb-5 grid gap-3 md:grid-cols-2">
+        <div className="mb-5 grid gap-3 xl:grid-cols-4">
           <label className="space-y-2 text-sm text-slate-600">
             Severidade
             <select
@@ -61,6 +77,29 @@ export function IssuesScreen({
           </label>
 
           <label className="space-y-2 text-sm text-slate-600">
+            Categoria
+            <select
+              aria-label="Filtrar por categoria"
+              className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3"
+              value={categoryFilter}
+              onChange={(event) =>
+                setCategoryFilter(event.target.value as IssueCategory | "all")
+              }
+            >
+              <option value="all">Todas</option>
+              <option value="availability">Availability</option>
+              <option value="reliability">Reliability</option>
+              <option value="rollout">Rollout</option>
+              <option value="autoscaling">Autoscaling</option>
+              <option value="networking">Networking</option>
+              <option value="configuration">Configuration</option>
+              <option value="capacity">Capacity</option>
+              <option value="cleanup">Cleanup</option>
+              <option value="observability">Observability</option>
+            </select>
+          </label>
+
+          <label className="space-y-2 text-sm text-slate-600">
             Origem
             <select
               aria-label="Filtrar por origem"
@@ -76,6 +115,30 @@ export function IssuesScreen({
               <option value="k8sgpt">K8sGPT</option>
             </select>
           </label>
+
+          <label className="space-y-2 text-sm text-slate-600">
+            Namespace
+            <input
+              aria-label="Filtrar por namespace"
+              className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3"
+              value={namespaceQuery}
+              onChange={(event) => setNamespaceQuery(event.target.value)}
+              placeholder="payments, monitoring, kube-system..."
+            />
+          </label>
+        </div>
+
+        <div className="mb-5 flex flex-wrap gap-2">
+          {Object.entries(categoryCounts)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([category, count]) => (
+              <span
+                key={category}
+                className="rounded-full border border-black/5 bg-slate-50 px-3 py-1 text-xs text-slate-600"
+              >
+                {category}: {count}
+              </span>
+            ))}
         </div>
 
         <div className="space-y-4">

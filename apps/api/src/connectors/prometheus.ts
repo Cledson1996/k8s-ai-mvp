@@ -5,6 +5,7 @@ export interface PrometheusMetrics {
   clusterMemoryBytes?: number;
   nodeCpu: Record<string, number>;
   nodeMemory: Record<string, number>;
+  nodeStorage: Record<string, number>;
   namespaceCpu: Record<string, number>;
   namespaceMemory: Record<string, number>;
   podCpu: Record<string, number>;
@@ -38,6 +39,7 @@ export class LivePrometheusConnector implements PrometheusConnector {
       clusterMemory,
       nodeCpu,
       nodeMemory,
+      nodeStorage,
       namespaceCpu,
       namespaceMemory,
       podCpu,
@@ -47,6 +49,7 @@ export class LivePrometheusConnector implements PrometheusConnector {
       this.instantScalar(`sum(container_memory_working_set_bytes{container!="",image!=""})`),
       this.instantVector(`sum by (node) (rate(container_cpu_usage_seconds_total{container!="",image!=""}[5m]))`, ["node", "instance"]),
       this.instantVector(`sum by (node) (container_memory_working_set_bytes{container!="",image!=""})`, ["node", "instance"]),
+      this.instantVector(`sum by (node) (container_fs_usage_bytes{container!="",image!=""})`, ["node", "instance"]),
       this.instantVector(`sum by (namespace) (rate(container_cpu_usage_seconds_total{container!="",image!=""}[5m]))`, ["namespace"]),
       this.instantVector(`sum by (namespace) (container_memory_working_set_bytes{container!="",image!=""})`, ["namespace"]),
       this.instantVector(`sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{container!="",image!=""}[5m]))`, ["namespace", "pod"]),
@@ -58,6 +61,7 @@ export class LivePrometheusConnector implements PrometheusConnector {
       clusterMemoryBytes: clusterMemory,
       nodeCpu,
       nodeMemory,
+      nodeStorage,
       namespaceCpu,
       namespaceMemory,
       podCpu,

@@ -6,8 +6,11 @@ import clsx from "clsx";
 
 const navigation = [
   { href: "/", label: "Overview", caption: "Saude geral" },
+  { href: "/explorer", label: "Explorer", caption: "Namespaces e recursos" },
+  { href: "/deployments", label: "Deployments", caption: "Apps, rede e dependencias" },
   { href: "/nodes", label: "Nodes", caption: "Capacidade e pressao" },
   { href: "/issues", label: "Issues", caption: "Diagnosticos e playbooks" },
+  { href: "/history", label: "History", caption: "Snapshots e diff" },
   { href: "/chat", label: "Chat", caption: "Pergunte ao cluster" }
 ];
 
@@ -43,7 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <nav className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <nav className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
             {navigation.map((item) => {
               const active = item.href === "/"
                 ? pathname === "/"

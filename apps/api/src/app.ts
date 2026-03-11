@@ -6,6 +6,7 @@ import { LiveKubernetesConnector } from "./connectors/kubernetes.js";
 import { LivePrometheusConnector } from "./connectors/prometheus.js";
 import { LiveAnalysisService, type AnalysisService } from "./services/analysis/service.js";
 import { LiveChatService, type ChatService } from "./services/chat/service.js";
+import { SnapshotRepository } from "./services/snapshot/repository.js";
 
 export interface AppServices {
   analysisService: AnalysisService;
@@ -16,7 +17,8 @@ export function buildServices(config: AppConfig = getConfig()): AppServices {
   const analysisService = new LiveAnalysisService(
     new LiveKubernetesConnector(config),
     new LivePrometheusConnector(config),
-    new LiveK8sGptConnector(config)
+    new LiveK8sGptConnector(config),
+    new SnapshotRepository(config.SQLITE_PATH)
   );
 
   return {
@@ -56,10 +58,11 @@ export async function createApp(services: AppServices = buildServices()) {
 
   app.get("/api/issues", async (request) => {
     const result = await services.analysisService.getLatestOrRun();
-    const { severity, namespace, source } = request.query as {
+    const { severity, namespace, source, category } = request.query as {
       severity?: string;
       namespace?: string;
       source?: string;
+      category?: string;
     };
 
     const issues = result.snapshot.issues.filter((issue) => {
@@ -75,6 +78,10 @@ export async function createApp(services: AppServices = buildServices()) {
         return false;
       }
 
+      if (category && issue.category !== category) {
+        return false;
+      }
+
       return true;
     });
 
@@ -84,7 +91,73 @@ export async function createApp(services: AppServices = buildServices()) {
     };
   });
 
+  app.get("/api/issues/cleanup", async () => {
+    const result = await services.analysisService.getLatestOrRun();
+    return {
+      issues: result.snapshot.issues.filter((issue) => issue.category === "cleanup"),
+      degradedSources: result.degradedSources
+    };
+  });
+
   app.post("/api/analysis/run", async () => services.analysisService.runAnalysis());
+
+  app.get("/api/namespaces", async () => services.analysisService.listNamespaces());
+
+  app.get("/api/deployments", async () => services.analysisService.listDeployments());
+
+  app.get("/api/namespaces/:name", async (request, reply) => {
+    const { name } = request.params as { name: string };
+    const result = await services.analysisService.getNamespace(name);
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "namespace not found"
+      };
+    }
+
+    return result;
+  });
+
+  app.get("/api/resources/:kind/:namespace/:name", async (request, reply) => {
+    const { kind, namespace, name } = request.params as { kind: string; namespace: string; name: string };
+    const result = await services.analysisService.getResourceDetail(kind as never, normalizeNamespace(namespace), name);
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "resource not found"
+      };
+    }
+
+    return result;
+  });
+
+  app.get("/api/resources/:kind/:namespace/:name/relations", async (request, reply) => {
+    const { kind, namespace, name } = request.params as { kind: string; namespace: string; name: string };
+    const result = await services.analysisService.getResourceRelations(kind as never, normalizeNamespace(namespace), name);
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "resource not found"
+      };
+    }
+
+    return result;
+  });
+
+  app.get("/api/snapshots", async () => services.analysisService.listSnapshots());
+
+  app.get("/api/snapshots/:id/diff/:previousId", async (request, reply) => {
+    const { id, previousId } = request.params as { id: string; previousId: string };
+    const result = await services.analysisService.getSnapshotDiff(id, previousId);
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "snapshot diff not found"
+      };
+    }
+
+    return result;
+  });
 
   app.post("/api/chat", async (request, reply) => {
     const body = request.body as { question?: string };
@@ -100,4 +173,8 @@ export async function createApp(services: AppServices = buildServices()) {
   });
 
   return app;
+}
+
+function normalizeNamespace(namespace: string): string | undefined {
+  return namespace === "_cluster" ? undefined : namespace;
 }

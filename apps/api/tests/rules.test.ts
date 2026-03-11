@@ -148,4 +148,78 @@ describe("buildRuleIssues", () => {
 
     expect(issues.some((issue) => issue.id.includes("cpu-mismatch"))).toBe(true);
   });
+
+  it("creates issue for service with selector and no endpoints", () => {
+    const issues = buildRuleIssues({
+      collectedAt: "2026-03-11T10:00:00.000Z",
+      pods: [],
+      nodes: [],
+      namespaces: [],
+      deployments: [],
+      rawPods: [],
+      workloadUsage: new Map(),
+      k8sGptFindings: [],
+      services: [
+        {
+          metadata: {
+            name: "payments-api",
+            namespace: "payments"
+          },
+          spec: {
+            selector: {
+              app: "payments-api"
+            }
+          }
+        } as never
+      ],
+      endpointSlices: []
+    });
+
+    expect(issues.some((issue) => issue.id === "service-no-endpoints-payments-payments-api")).toBe(true);
+  });
+
+  it("creates issue for deployment without probes", () => {
+    const deployment = {
+      metadata: {
+        name: "api",
+        namespace: "prod"
+      },
+      spec: {
+        replicas: 2,
+        template: {
+          metadata: {
+            labels: {
+              app: "api"
+            }
+          },
+          spec: {
+            containers: [
+              {
+                name: "api",
+                image: "nginx",
+                ports: [{ containerPort: 8080 }]
+              }
+            ]
+          }
+        }
+      },
+      status: {
+        readyReplicas: 2
+      }
+    } as unknown as V1Deployment;
+
+    const issues = buildRuleIssues({
+      collectedAt: "2026-03-11T10:00:00.000Z",
+      pods: [],
+      nodes: [],
+      namespaces: [],
+      deployments: [deployment],
+      rawPods: [],
+      workloadUsage: new Map(),
+      k8sGptFindings: [],
+      services: []
+    });
+
+    expect(issues.some((issue) => issue.id === "deployment-missing-probes-prod-api")).toBe(true);
+  });
 });
