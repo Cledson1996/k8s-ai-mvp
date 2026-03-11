@@ -2019,7 +2019,12 @@ function toYaml(value: unknown, depth = 0): string {
           return `${indent}-\n${rendered}`;
         }
 
-        return `${indent}- ${renderYamlScalar(item)}`;
+        const scalar = renderYamlScalar(item, depth + 1);
+        if (scalar.block) {
+          return `${indent}- ${scalar.block}`;
+        }
+
+        return `${indent}- ${scalar.inline}`;
       })
       .join("\n");
   }
@@ -2047,38 +2052,76 @@ function toYaml(value: unknown, depth = 0): string {
           return `${indent}${key}:\n${toYaml(entry, depth + 1)}`;
         }
 
-        return `${indent}${key}: ${renderYamlScalar(entry)}`;
+        const scalar = renderYamlScalar(entry, depth + 1);
+        if (scalar.block) {
+          return `${indent}${key}: ${scalar.block}`;
+        }
+
+        return `${indent}${key}: ${scalar.inline}`;
       })
       .join("\n");
   }
 
-  return `${indent}${renderYamlScalar(value)}`;
+  const scalar = renderYamlScalar(value, depth);
+  return scalar.block ? `${indent}${scalar.block}` : `${indent}${scalar.inline}`;
 }
 
-function renderYamlScalar(value: unknown): string {
+function renderYamlScalar(
+  value: unknown,
+  depth: number
+): {
+  inline?: string;
+  block?: string;
+} {
   if (value === null || value === undefined) {
-    return "null";
+    return { inline: "null" };
   }
 
   if (typeof value === "number" || typeof value === "bigint") {
-    return String(value);
+    return { inline: String(value) };
   }
 
   if (typeof value === "boolean") {
-    return value ? "true" : "false";
+    return { inline: value ? "true" : "false" };
   }
 
   const stringValue = String(value);
-  if (stringValue.includes("\n")) {
-    const lines = stringValue.split("\n").map((line) => `  ${line}`);
-    return `|-\n${lines.join("\n")}`;
+  const prettyJson = tryFormatJsonString(stringValue);
+  const multilineValue = prettyJson ?? stringValue;
+
+  if (multilineValue.includes("\n")) {
+    const nestedIndent = "  ".repeat(depth + 1);
+    const lines = multilineValue.split("\n").map((line) => `${nestedIndent}${line}`);
+    return {
+      block: `|-\n${lines.join("\n")}`
+    };
   }
 
   if (/^[A-Za-z0-9._/@:-]+$/.test(stringValue)) {
-    return stringValue;
+    return { inline: stringValue };
   }
 
-  return JSON.stringify(stringValue);
+  if (stringValue.length > 120) {
+    const nestedIndent = "  ".repeat(depth + 1);
+    return {
+      block: `|-\n${nestedIndent}${stringValue}`
+    };
+  }
+
+  return { inline: JSON.stringify(stringValue) };
+}
+
+function tryFormatJsonString(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+    return undefined;
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return undefined;
+  }
 }
 
 function getUpdatedReplicas(workload: V1Deployment | V1StatefulSet | V1DaemonSet) {
