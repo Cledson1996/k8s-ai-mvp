@@ -48,9 +48,12 @@ export class LiveAnalysisService implements AnalysisService {
     }
 
     const stored = this.repository.getLatest();
-    if (stored && !needsSnapshotRefresh(stored)) {
+    if (stored) {
       this.latestStoredSnapshot = stored;
       this.latestResult = toAnalysisResult(stored);
+      if (needsSnapshotRefresh(stored)) {
+        this.scheduleRefresh();
+      }
       return this.latestResult;
     }
 
@@ -156,12 +159,18 @@ export class LiveAnalysisService implements AnalysisService {
 
   private async getStoredSnapshot(): Promise<StoredSnapshot> {
     if (this.latestStoredSnapshot) {
+      if (needsSnapshotRefresh(this.latestStoredSnapshot)) {
+        this.scheduleRefresh();
+      }
       return this.latestStoredSnapshot;
     }
 
     const stored = this.repository.getLatest();
-    if (stored && !needsSnapshotRefresh(stored)) {
+    if (stored) {
       this.latestStoredSnapshot = stored;
+      if (needsSnapshotRefresh(stored)) {
+        this.scheduleRefresh();
+      }
       return stored;
     }
 
@@ -206,6 +215,14 @@ export class LiveAnalysisService implements AnalysisService {
       clusterSnapshot: stored.snapshot,
       degradedSources: stored.snapshot.degradedSources
     };
+  }
+
+  private scheduleRefresh() {
+    if (this.inFlight) {
+      return;
+    }
+
+    void this.runAnalysis().catch(() => undefined);
   }
 }
 
@@ -258,7 +275,31 @@ function needsSnapshotRefresh(stored: StoredSnapshot): boolean {
     stored.snapshot.resources?.filter((resource) => resource.kind === "Deployment").length ?? 0;
   const deploymentInventoryCount = stored.snapshot.deployments?.length ?? 0;
   const hasNodeWorkloads = stored.snapshot.nodes.every((node) => Array.isArray(node.workloads));
-  const hasDegradedSources = (stored.snapshot.degradedSources?.length ?? 0) > 0;
+  const resourceDetails = Object.values(stored.detailsByKey ?? {});
+  const realResourceKinds = new Set([
+    "Namespace",
+    "Node",
+    "Deployment",
+    "ReplicaSet",
+    "StatefulSet",
+    "DaemonSet",
+    "Pod",
+    "Service",
+    "EndpointSlice",
+    "Ingress",
+    "IngressClass",
+    "HorizontalPodAutoscaler",
+    "PodDisruptionBudget",
+    "ServiceAccount",
+    "Job",
+    "CronJob",
+    "PersistentVolumeClaim",
+    "ConfigMap",
+    "Secret"
+  ]);
+  const hasAnyManifestYaml = resourceDetails.some(
+    (detail) => realResourceKinds.has(detail.kind) && Boolean(detail.manifestYaml)
+  );
 
   if (deploymentResources > 0 && deploymentInventoryCount === 0) {
     return true;
@@ -268,7 +309,7 @@ function needsSnapshotRefresh(stored: StoredSnapshot): boolean {
     return true;
   }
 
-  if (hasDegradedSources) {
+  if (resourceDetails.length > 0 && !hasAnyManifestYaml) {
     return true;
   }
 

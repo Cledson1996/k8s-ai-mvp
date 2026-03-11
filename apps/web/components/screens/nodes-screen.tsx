@@ -107,6 +107,15 @@ function NodeCard({ node }: { node: NodeHealth }) {
         </div>
       </div>
 
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href={buildResourceHref("Node", "_cluster", node.name)}
+          className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition hover:bg-tide"
+        >
+          Abrir node
+        </Link>
+      </div>
+
       <div className="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="space-y-4">
           <CapacityPanel

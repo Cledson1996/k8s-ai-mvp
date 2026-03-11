@@ -354,6 +354,7 @@ export interface ResourceDetail extends ResourceSummary {
   metrics?: ResourceUsage;
   issues: Issue[];
   suggestedCommands: string[];
+  manifestYaml?: string;
   relations: ResourceRelation[];
   insights: string[];
   references: Array<{

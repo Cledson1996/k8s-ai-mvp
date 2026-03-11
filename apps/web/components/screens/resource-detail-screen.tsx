@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Breadcrumbs } from "../ui/breadcrumbs";
 import { SectionCard } from "../ui/section-card";
 import { StateBanner } from "../ui/state-banner";
@@ -22,6 +23,7 @@ export function ResourceDetailScreen({
   detail: ResourceDetail;
   degradedSources: string[];
 }) {
+  const [showYaml, setShowYaml] = useState(false);
   const { resource } = detail;
   const references = detail.references ?? [];
   const insights = detail.insights ?? [];
@@ -75,7 +77,16 @@ export function ResourceDetailScreen({
             <Metric label="CPU" value={formatCpu(detail.metrics.cpuCores)} />
             <Metric label="Memoria" value={formatMemory(detail.metrics.memoryBytes)} />
           </div>
-          <HealthPill health={resource.health} />
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowYaml(true)}
+              className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Ver YAML
+            </button>
+            <HealthPill health={resource.health} />
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -487,6 +498,14 @@ export function ResourceDetailScreen({
           </SectionCard>
         </div>
       </div>
+
+      {showYaml ? (
+        <YamlModal
+          title={`${resource.kind} ${resource.name}`}
+          yaml={detail.manifestYaml}
+          onClose={() => setShowYaml(false)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -527,4 +546,51 @@ function renderTarget(current?: number, target?: number) {
   }
 
   return `${current ?? "--"}% / ${target ?? "--"}%`;
+}
+
+function YamlModal({
+  title,
+  yaml,
+  onClose
+}: {
+  title: string;
+  yaml?: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6" onClick={onClose}>
+      <div
+        className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-black/5 px-5 py-4">
+          <div>
+            <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-slate-500">
+              Manifesto do recurso
+            </p>
+            <h3 className="mt-2 font-[var(--font-heading)] text-xl font-semibold text-ink">{title}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <div className="overflow-auto bg-ink px-5 py-5">
+          {yaml ? (
+            <pre className="whitespace-pre-wrap break-words text-sm text-white">
+              <code>{yaml}</code>
+            </pre>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/75">
+              O YAML bruto ainda nao esta disponivel para este recurso nesta coleta.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

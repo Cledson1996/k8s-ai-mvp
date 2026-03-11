@@ -116,7 +116,7 @@ export function buildClusterSnapshot(input: BuildSnapshotInput): BuiltSnapshot {
   };
 
   addNamespaceResources(context, inventory, namespaceHealth);
-  addNodeResources(context, nodes, issues);
+  addNodeResources(context, inventory.nodes, nodes, issues);
   addWorkloadResources(context, inventory.deployments, "Deployment", "workload", workloadUsage, issues);
   addReplicaSetResources(context, inventory.replicaSets, issues);
   addWorkloadResources(context, inventory.statefulSets, "StatefulSet", "workload", workloadUsage, issues);
@@ -200,11 +200,7 @@ export function buildClusterSnapshot(input: BuildSnapshotInput): BuiltSnapshot {
   };
 }
 
-function addNamespaceResources(
-  context: ResourceBuildContext,
-  inventory: ClusterInventory,
-  namespaceHealth: NamespaceHealth[]
-) {
+function addNamespaceResources(context: ResourceBuildContext, inventory: ClusterInventory, namespaceHealth: NamespaceHealth[]) {
   for (const namespace of inventory.namespaces) {
     const name = namespace.metadata?.name ?? "default";
     const health = namespaceHealth.find((item) => item.name === name);
@@ -228,6 +224,7 @@ function addNamespaceResources(
       ...summary,
       metrics: summary.usage,
       issues: [],
+      manifestYaml: serializeManifest(namespace),
       suggestedCommands: [
         `kubectl get all -n ${name}`,
         `kubectl get events -n ${name} --sort-by=.lastTimestamp`
@@ -243,10 +240,16 @@ function addNamespaceResources(
   }
 }
 
-function addNodeResources(context: ResourceBuildContext, nodes: NodeHealth[], issues: Issue[]) {
+function addNodeResources(
+  context: ResourceBuildContext,
+  rawNodes: V1Node[],
+  nodes: NodeHealth[],
+  issues: Issue[]
+) {
   for (const node of nodes) {
     const key = resourceKey("Node", node.name);
     const nodeIssues = issues.filter((issue) => issue.resourceRef?.kind === "Node" && issue.resourceRef.name === node.name);
+    const rawNode = rawNodes.find((item) => (item.metadata?.name ?? "unknown") === node.name);
     const summary: ResourceSummary = {
       key,
       kind: "Node",
@@ -263,6 +266,7 @@ function addNodeResources(context: ResourceBuildContext, nodes: NodeHealth[], is
       ...summary,
       metrics: node.usage,
       issues: nodeIssues,
+      manifestYaml: serializeManifest(rawNode),
       suggestedCommands: [
         `kubectl describe node ${node.name}`,
         `kubectl top pod -A --field-selector spec.nodeName=${node.name}`
@@ -318,6 +322,7 @@ function addWorkloadResources<T extends Workload>(
       ...summary,
       metrics: summary.usage,
       issues: workloadIssues,
+      manifestYaml: serializeManifest(workload),
       suggestedCommands: [
         `kubectl describe ${kind.toLowerCase()} ${name} -n ${namespace}`,
         `kubectl get ${kind.toLowerCase()} ${name} -n ${namespace} -o yaml`
@@ -356,6 +361,7 @@ function addReplicaSetResources(context: ResourceBuildContext, replicaSets: V1Re
     context.details.set(key, {
       ...summary,
       issues: replicaSetIssues,
+      manifestYaml: serializeManifest(replicaSet),
       suggestedCommands: [
         `kubectl describe replicaset ${name} -n ${namespace}`,
         `kubectl get replicaset ${name} -n ${namespace} -o yaml`
@@ -394,6 +400,7 @@ function addHorizontalPodAutoscalerResources(
     context.details.set(key, {
       ...summary,
       issues: hpaIssues,
+      manifestYaml: serializeManifest(hpa),
       suggestedCommands: [
         `kubectl describe hpa ${name} -n ${namespace}`,
         `kubectl get hpa ${name} -n ${namespace} -o yaml`
@@ -431,6 +438,7 @@ function addJobResources(context: ResourceBuildContext, jobs: V1Job[], issues: I
     context.details.set(key, {
       ...summary,
       issues: jobIssues,
+      manifestYaml: serializeManifest(job),
       suggestedCommands: [
         `kubectl describe job ${name} -n ${namespace}`,
         `kubectl logs job/${name} -n ${namespace}`
@@ -465,6 +473,7 @@ function addCronJobResources(context: ResourceBuildContext, cronJobs: V1CronJob[
     context.details.set(key, {
       ...summary,
       issues: cronIssues,
+      manifestYaml: serializeManifest(cronJob),
       suggestedCommands: [
         `kubectl describe cronjob ${name} -n ${namespace}`,
         `kubectl get cronjob ${name} -n ${namespace} -o yaml`
@@ -505,6 +514,7 @@ function addPodResources(context: ResourceBuildContext, rawPods: V1Pod[], pods: 
       ...summary,
       metrics: summary.usage,
       issues: podIssues,
+      manifestYaml: serializeManifest(rawPod),
       suggestedCommands: [
         `kubectl describe pod ${pod.name} -n ${pod.namespace}`,
         `kubectl logs ${pod.name} -n ${pod.namespace} --previous`
@@ -549,6 +559,7 @@ function addServiceResources(context: ResourceBuildContext, services: V1Service[
     context.details.set(key, {
       ...summary,
       issues: serviceIssues,
+      manifestYaml: serializeManifest(service),
       suggestedCommands: [
         `kubectl describe service ${name} -n ${namespace}`,
         `kubectl get endpoints ${name} -n ${namespace}`
@@ -590,6 +601,7 @@ function addEndpointSliceResources(context: ResourceBuildContext, endpointSlices
     context.details.set(key, {
       ...summary,
       issues: endpointIssues,
+      manifestYaml: serializeManifest(endpointSlice),
       suggestedCommands: [
         `kubectl describe endpointslice ${name} -n ${namespace}`
       ],
@@ -625,6 +637,7 @@ function addIngressResources(context: ResourceBuildContext, ingresses: V1Ingress
     context.details.set(key, {
       ...summary,
       issues: ingressIssues,
+      manifestYaml: serializeManifest(ingress),
       suggestedCommands: [
         `kubectl describe ingress ${name} -n ${namespace}`,
         `kubectl get ingress ${name} -n ${namespace} -o yaml`
@@ -657,6 +670,7 @@ function addIngressClassResources(context: ResourceBuildContext, ingressClasses:
     context.details.set(key, {
       ...summary,
       issues: ingressClassIssues,
+      manifestYaml: serializeManifest(ingressClass),
       suggestedCommands: [`kubectl describe ingressclass ${name}`],
       relations: [],
       insights: [`Controller: ${ingressClass.spec?.controller ?? "unknown"}.`],
@@ -691,6 +705,7 @@ function addPodDisruptionBudgetResources(
     context.details.set(key, {
       ...summary,
       issues: pdbIssues,
+      manifestYaml: serializeManifest(podDisruptionBudget),
       suggestedCommands: [`kubectl describe pdb ${name} -n ${namespace}`],
       relations: [],
       insights: [
@@ -728,6 +743,7 @@ function addServiceAccountResources(
     context.details.set(key, {
       ...summary,
       issues: serviceAccountIssues,
+      manifestYaml: serializeManifest(serviceAccount),
       suggestedCommands: [`kubectl describe serviceaccount ${name} -n ${namespace}`],
       relations: [],
       insights: [
@@ -761,6 +777,7 @@ function addSecretResources(context: ResourceBuildContext, secrets: V1Secret[], 
     context.details.set(key, {
       ...summary,
       issues: secretIssues,
+      manifestYaml: serializeManifest(secret),
       suggestedCommands: [`kubectl describe secret ${name} -n ${namespace}`],
       relations: [],
       insights: ["Secret metadata only; no secret data is read or stored."],
@@ -792,6 +809,7 @@ function addPvcResources(context: ResourceBuildContext, pvcs: V1PersistentVolume
     context.details.set(key, {
       ...summary,
       issues: pvcIssues,
+      manifestYaml: serializeManifest(pvc),
       suggestedCommands: [`kubectl describe pvc ${name} -n ${namespace}`],
       relations: [],
       insights: [`StorageClass: ${pvc.spec?.storageClassName ?? "default"}.`],
@@ -823,6 +841,7 @@ function addConfigMapResources(context: ResourceBuildContext, configMaps: V1Conf
     context.details.set(key, {
       ...summary,
       issues: configIssues,
+      manifestYaml: serializeManifest(configMap),
       suggestedCommands: [`kubectl describe configmap ${name} -n ${namespace}`],
       relations: [],
       insights: [`${Object.keys(configMap.data ?? {}).length} configuration entries.`],
@@ -1690,6 +1709,7 @@ function ensureReferenceResource(context: ResourceBuildContext, reference: Refer
   context.details.set(key, {
     ...summary,
     issues: [],
+    manifestYaml: undefined,
     suggestedCommands:
       reference.kind === "Secret"
         ? [`kubectl describe secret ${reference.name} -n ${resourceNamespace}`]
@@ -1943,6 +1963,122 @@ function hasDeploymentRolloutIssue(deployment: V1Deployment) {
   }
 
   return false;
+}
+
+function serializeManifest(resource: unknown): string | undefined {
+  if (!resource || typeof resource !== "object") {
+    return undefined;
+  }
+
+  const normalized = sanitizeManifest(resource);
+  return toYaml(normalized).trim();
+}
+
+function sanitizeManifest(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeManifest(item));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  const output: Record<string, unknown> = {};
+  const isSecret = record.kind === "Secret";
+
+  for (const [key, entry] of Object.entries(record)) {
+    if (key === "managedFields") {
+      continue;
+    }
+
+    if (isSecret && (key === "data" || key === "stringData")) {
+      const secretData = entry && typeof entry === "object" ? Object.keys(entry as Record<string, unknown>) : [];
+      output[key] = Object.fromEntries(secretData.map((secretKey) => [secretKey, "<redacted>"]));
+      continue;
+    }
+
+    output[key] = sanitizeManifest(entry);
+  }
+
+  return output;
+}
+
+function toYaml(value: unknown, depth = 0): string {
+  const indent = "  ".repeat(depth);
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return "[]";
+    }
+
+    return value
+      .map((item) => {
+        if (item && typeof item === "object") {
+          const rendered = toYaml(item, depth + 1);
+          return `${indent}-\n${rendered}`;
+        }
+
+        return `${indent}- ${renderYamlScalar(item)}`;
+      })
+      .join("\n");
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) {
+      return "{}";
+    }
+
+    return entries
+      .map(([key, entry]) => {
+        if (Array.isArray(entry)) {
+          if (entry.length === 0) {
+            return `${indent}${key}: []`;
+          }
+          return `${indent}${key}:\n${toYaml(entry, depth + 1)}`;
+        }
+
+        if (entry && typeof entry === "object") {
+          const objectEntries = Object.entries(entry as Record<string, unknown>);
+          if (objectEntries.length === 0) {
+            return `${indent}${key}: {}`;
+          }
+          return `${indent}${key}:\n${toYaml(entry, depth + 1)}`;
+        }
+
+        return `${indent}${key}: ${renderYamlScalar(entry)}`;
+      })
+      .join("\n");
+  }
+
+  return `${indent}${renderYamlScalar(value)}`;
+}
+
+function renderYamlScalar(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "null";
+  }
+
+  if (typeof value === "number" || typeof value === "bigint") {
+    return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+
+  const stringValue = String(value);
+  if (stringValue.includes("\n")) {
+    const lines = stringValue.split("\n").map((line) => `  ${line}`);
+    return `|-\n${lines.join("\n")}`;
+  }
+
+  if (/^[A-Za-z0-9._/@:-]+$/.test(stringValue)) {
+    return stringValue;
+  }
+
+  return JSON.stringify(stringValue);
 }
 
 function getUpdatedReplicas(workload: V1Deployment | V1StatefulSet | V1DaemonSet) {

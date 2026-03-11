@@ -227,6 +227,7 @@ export interface ResourceDetail {
   };
   issues: Issue[];
   suggestedCommands: string[];
+  manifestYaml?: string;
   relations: ResourceRelation[];
   history: ResourceHistoryEntry[];
   rollout?: ResourceRollout;

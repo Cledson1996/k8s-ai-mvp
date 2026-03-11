@@ -400,6 +400,7 @@ function toResourceDetail(resource: BackendResourceDetail, collectedAt: string):
     },
     issues,
     suggestedCommands: resource.suggestedCommands ?? [],
+    manifestYaml: resource.manifestYaml,
     relations,
     history: (resource.history ?? []).map((entry) => ({
       id: `${entry.snapshotId}-${entry.resourceKey}-${entry.changeType}`,

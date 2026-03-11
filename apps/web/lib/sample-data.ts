@@ -849,6 +849,21 @@ export const sampleResourceDetails: ResourceDetail[] = [
         namespace: "payments"
       }
     ],
+    manifestYaml: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-worker
+  namespace: payments
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payments-worker
+  template:
+    metadata:
+      labels:
+        app: payments-worker
+        tier: worker`,
     rollout: {
       desiredReplicas: 3,
       readyReplicas: 2,
@@ -1026,6 +1041,18 @@ export const sampleResourceDetails: ResourceDetail[] = [
     insights: [
       "Service com backends parciais e dependencia direta do ingress publico."
     ],
+    manifestYaml: `apiVersion: v1
+kind: Service
+metadata:
+  name: core-api
+  namespace: core-api
+spec:
+  type: ClusterIP
+  selector:
+    app: core-api
+  ports:
+    - port: 8080
+      targetPort: 8080`,
     references: [],
     issues: coreApiIssues,
     suggestedCommands: [
@@ -1256,6 +1283,11 @@ export function getSampleResourceDetail(
       suggestedCommands: [
         `kubectl -n ${namespace} describe ${kind.toLowerCase()} ${name}`
       ],
+      manifestYaml: `apiVersion: v1
+kind: ${kind}
+metadata:
+  name: ${name}
+  namespace: ${namespace}`,
       relations: [],
       history: [],
       insights: [],
