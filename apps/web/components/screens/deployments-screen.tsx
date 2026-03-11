@@ -3,10 +3,15 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { DeploymentInventory } from "../../lib/explorer-types";
+import {
+  formatCpuCompact,
+  formatMemoryCompact,
+} from "../../lib/format";
 import { buildResourceHref } from "../../lib/routes";
 import { SectionCard } from "../ui/section-card";
 import { StateBanner } from "../ui/state-banner";
 import { HealthPill } from "../ui/explorer-pill";
+import { DeploymentHistoryModal } from "../ui/history-metrics-modal";
 import { SeverityPill } from "../ui/status-pill";
 
 export function DeploymentsScreen({
@@ -133,6 +138,7 @@ export function DeploymentsScreen({
 
 function DeploymentCard({ deployment }: { deployment: DeploymentInventory }) {
   const [expanded, setExpanded] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const services = deployment.exposure?.services ?? [];
   const ingresses = deployment.exposure?.ingresses ?? [];
 
@@ -165,6 +171,13 @@ function DeploymentCard({ deployment }: { deployment: DeploymentInventory }) {
         </div>
       </div>
 
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <Metric label="CPU media" value={formatCpuCompact(deployment.history?.cpu.avg)} />
+        <Metric label="CPU pico" value={formatCpuCompact(deployment.history?.cpu.max)} />
+        <Metric label="RAM media" value={formatMemoryCompact(deployment.history?.memory.avg)} />
+        <Metric label="RAM pico" value={formatMemoryCompact(deployment.history?.memory.max)} />
+      </div>
+
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full border border-black/5 bg-slate-50 px-3 py-1 text-xs text-slate-600">
@@ -188,6 +201,13 @@ function DeploymentCard({ deployment }: { deployment: DeploymentInventory }) {
           >
             Abrir deployment
           </Link>
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Ver grafico
+          </button>
           <button
             type="button"
             onClick={() => setExpanded((value) => !value)}
@@ -360,6 +380,14 @@ function DeploymentCard({ deployment }: { deployment: DeploymentInventory }) {
             </SubCard>
           </div>
         </div>
+      ) : null}
+
+      {showHistory ? (
+        <DeploymentHistoryModal
+          name={deployment.name}
+          namespace={deployment.namespace}
+          onClose={() => setShowHistory(false)}
+        />
       ) : null}
     </article>
   );

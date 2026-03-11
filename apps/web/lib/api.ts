@@ -590,6 +590,7 @@ function toDeploymentInventory(
         }
       : undefined,
     references: deployment.references ?? [],
+    history: deployment.history,
     cleanupSignals: deployment.cleanupSignals ?? [],
     topIssues: deployment.topIssues ?? [],
     suggestedCommands: deployment.suggestedCommands ?? [],

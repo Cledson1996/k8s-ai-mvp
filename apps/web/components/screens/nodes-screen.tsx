@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { NodeHealth } from "@k8s-ai-mvp/shared";
 import { buildResourceHref } from "../../lib/routes";
-import { formatCpu, formatMemory, formatPercent } from "../../lib/format";
+import {
+  formatCpu,
+  formatCpuCompact,
+  formatMemory,
+  formatMemoryCompact,
+  formatPercent,
+} from "../../lib/format";
+import { NodeHistoryModal } from "../ui/history-metrics-modal";
 import { SectionCard } from "../ui/section-card";
 import { StateBanner } from "../ui/state-banner";
 
@@ -48,6 +55,7 @@ export function NodesScreen({
 
 function NodeCard({ node }: { node: NodeHealth }) {
   const [expanded, setExpanded] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const workloadList = node.workloads ?? node.topWorkloads ?? [];
   const cpuCapacity = node.capacity?.cpu ?? {};
   const memoryCapacity = node.capacity?.memory ?? {};
@@ -107,6 +115,13 @@ function NodeCard({ node }: { node: NodeHealth }) {
         </div>
       </div>
 
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <Metric label="CPU media" value={formatCpuCompact(node.history?.cpu.avg)} />
+        <Metric label="CPU pico" value={formatCpuCompact(node.history?.cpu.max)} />
+        <Metric label="RAM media" value={formatMemoryCompact(node.history?.memory.avg)} />
+        <Metric label="RAM pico" value={formatMemoryCompact(node.history?.memory.max)} />
+      </div>
+
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           href={buildResourceHref("Node", "_cluster", node.name)}
@@ -114,6 +129,13 @@ function NodeCard({ node }: { node: NodeHealth }) {
         >
           Abrir node
         </Link>
+        <button
+          type="button"
+          onClick={() => setShowHistory(true)}
+          className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          Ver grafico
+        </button>
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
@@ -228,6 +250,13 @@ function NodeCard({ node }: { node: NodeHealth }) {
           </div>
         </div>
       </div>
+
+      {showHistory ? (
+        <NodeHistoryModal
+          name={node.name}
+          onClose={() => setShowHistory(false)}
+        />
+      ) : null}
     </article>
   );
 }

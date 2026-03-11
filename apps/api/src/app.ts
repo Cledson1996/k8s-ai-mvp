@@ -52,11 +52,7 @@ export async function createApp(services: AppServices = buildServices()) {
   });
 
   app.get("/api/nodes", async () => {
-    const result = await services.analysisService.getLatestOrRun();
-    return {
-      nodes: result.snapshot.nodes,
-      degradedSources: result.degradedSources,
-    };
+    return services.analysisService.listNodes();
   });
 
   app.get("/api/issues", async (request) => {
@@ -115,6 +111,44 @@ export async function createApp(services: AppServices = buildServices()) {
   app.get("/api/deployments", async () =>
     services.analysisService.listDeployments(),
   );
+
+  app.get("/api/deployments/metrics", async (request) => {
+    const { window } = request.query as { window?: string };
+    return services.analysisService.listDeployments(normalizeWindow(window));
+  });
+
+  app.get("/api/deployments/:namespace/:name/metrics", async (request, reply) => {
+    const { namespace, name } = request.params as { namespace: string; name: string };
+    const { window } = request.query as { window?: string };
+    const result = await services.analysisService.getDeploymentMetrics(namespace, name, normalizeWindow(window));
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "deployment metrics not found",
+      };
+    }
+
+    return result;
+  });
+
+  app.get("/api/nodes/metrics", async (request) => {
+    const { window } = request.query as { window?: string };
+    return services.analysisService.listNodes(normalizeWindow(window));
+  });
+
+  app.get("/api/nodes/:name/metrics", async (request, reply) => {
+    const { name } = request.params as { name: string };
+    const { window } = request.query as { window?: string };
+    const result = await services.analysisService.getNodeMetrics(name, normalizeWindow(window));
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "node metrics not found",
+      };
+    }
+
+    return result;
+  });
 
   app.get("/api/workloads", async () =>
     services.analysisService.listWorkloads(),
@@ -219,4 +253,11 @@ export async function createApp(services: AppServices = buildServices()) {
 
 function normalizeNamespace(namespace: string): string | undefined {
   return namespace === "_cluster" ? undefined : namespace;
+}
+
+function normalizeWindow(window?: string): "1h" | "6h" | "24h" | "7d" {
+  if (window === "1h" || window === "6h" || window === "24h" || window === "7d") {
+    return window;
+  }
+  return "7d";
 }

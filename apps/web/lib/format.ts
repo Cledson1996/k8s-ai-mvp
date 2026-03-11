@@ -51,3 +51,34 @@ export function formatPercent(value?: number) {
 
   return `${value.toFixed(0)}%`;
 }
+
+export function formatCpuCompact(value?: number) {
+  if (value === undefined) {
+    return "--";
+  }
+
+  if (value < 1) {
+    return `${(value * 1000).toFixed(0)}m`;
+  }
+
+  return `${value.toFixed(value >= 10 ? 1 : 2)} cores`;
+}
+
+export function formatMemoryCompact(value?: number) {
+  return formatMemory(value);
+}
+
+export function formatMetricTimestamp(value: string, window: "1h" | "6h" | "24h" | "7d") {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: window === "7d" ? "2-digit" : undefined,
+    month: window === "7d" ? "2-digit" : undefined,
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}

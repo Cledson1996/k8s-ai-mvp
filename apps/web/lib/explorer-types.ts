@@ -46,6 +46,30 @@ export interface CapacityBreakdown {
   available?: number;
 }
 
+export type MetricWindow = "1h" | "6h" | "24h" | "7d";
+
+export interface UsageMetricSummary {
+  avg?: number;
+  max?: number;
+}
+
+export interface UsageHistorySummary {
+  window: MetricWindow;
+  cpu: UsageMetricSummary;
+  memory: UsageMetricSummary;
+}
+
+export interface TimeSeriesPoint {
+  timestamp: string;
+  value: number;
+}
+
+export interface ResourceHistorySeries {
+  key: string;
+  label: string;
+  points: TimeSeriesPoint[];
+}
+
 export interface NodeWorkloadSummary {
   key?: string;
   kind: string;
@@ -264,9 +288,40 @@ export interface DeploymentInventory {
     name: string;
     namespace?: string;
   }>;
+  history?: UsageHistorySummary;
   cleanupSignals: string[];
   topIssues: Issue[];
   suggestedCommands: string[];
+}
+
+export interface DeploymentMetricsResponse {
+  deployment: {
+    key: string;
+    name: string;
+    namespace: string;
+  };
+  window: MetricWindow;
+  summary: UsageHistorySummary;
+  cpu: {
+    aggregate: ResourceHistorySeries;
+    pods: ResourceHistorySeries[];
+  };
+  memory: {
+    aggregate: ResourceHistorySeries;
+    pods: ResourceHistorySeries[];
+  };
+  degradedSources: string[];
+}
+
+export interface NodeMetricsResponse {
+  node: {
+    name: string;
+  };
+  window: MetricWindow;
+  summary: UsageHistorySummary;
+  cpu: ResourceHistorySeries;
+  memory: ResourceHistorySeries;
+  degradedSources: string[];
 }
 
 export interface ClusterSnapshot {

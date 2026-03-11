@@ -1,8 +1,12 @@
 import type {
   AnalysisRunResponse,
+  DeploymentMetricsResponse,
   DeploymentsResponse,
+  MetricWindow,
   NamespaceDetailResponse,
   NamespacesResponse,
+  NodeHealth,
+  NodeMetricsResponse,
   ResourceDetailResponse,
   ResourceKind,
   ResourceRelationsResponse,
@@ -14,6 +18,11 @@ import type {
 import type { KubernetesConnector } from "../../connectors/kubernetes.js";
 import type { K8sGptConnector } from "../../connectors/k8sgpt.js";
 import type { PrometheusConnector } from "../../connectors/prometheus.js";
+import {
+  buildHistorySeries,
+  summarizeSeries,
+  sumSeriesByKeys,
+} from "../../connectors/prometheus.js";
 import { buildClusterSnapshot } from "../snapshot/builder.js";
 import {
   SnapshotRepository,
@@ -37,7 +46,20 @@ export interface AnalysisService {
     namespace: string | undefined,
     name: string,
   ): Promise<ResourceRelationsResponse | undefined>;
-  listDeployments(): Promise<DeploymentsResponse>;
+  listNodes(window?: MetricWindow): Promise<{
+    nodes: NodeHealth[];
+    degradedSources: string[];
+  }>;
+  listDeployments(window?: MetricWindow): Promise<DeploymentsResponse>;
+  getDeploymentMetrics(
+    namespace: string,
+    name: string,
+    window?: MetricWindow
+  ): Promise<DeploymentMetricsResponse | undefined>;
+  getNodeMetrics(
+    name: string,
+    window?: MetricWindow
+  ): Promise<NodeMetricsResponse | undefined>;
   listWorkloads(): Promise<WorkloadsResponse>;
   listSnapshots(): Promise<SnapshotsResponse>;
   getSnapshotDiff(
@@ -159,12 +181,140 @@ export class LiveAnalysisService implements AnalysisService {
     };
   }
 
-  async listDeployments(): Promise<DeploymentsResponse> {
+  async listNodes(window: MetricWindow = "7d"): Promise<{
+    nodes: NodeHealth[];
+    degradedSources: string[];
+  }> {
     const stored = await this.getStoredSnapshot();
+    const { history, degradedSources } = await this.buildNodeHistorySummary(
+      stored,
+      window,
+    );
+
     return {
-      deployments: stored.snapshot.deployments ?? [],
+      nodes: stored.snapshot.nodes.map((node) => ({
+        ...node,
+        history: history[node.name],
+      })),
+      degradedSources,
+    };
+  }
+
+  async listDeployments(window: MetricWindow = "7d"): Promise<DeploymentsResponse> {
+    const stored = await this.getStoredSnapshot();
+    const { history, degradedSources } = await this.buildDeploymentHistorySummary(
+      stored,
+      window,
+    );
+    return {
+      deployments: (stored.snapshot.deployments ?? []).map((deployment) => ({
+        ...deployment,
+        history: history[deployment.key],
+      })),
       snapshot: toSnapshotSummary(stored.snapshot),
-      degradedSources: stored.snapshot.degradedSources,
+      degradedSources,
+    };
+  }
+
+  async getDeploymentMetrics(
+    namespace: string,
+    name: string,
+    window: MetricWindow = "7d"
+  ): Promise<DeploymentMetricsResponse | undefined> {
+    const stored = await this.getStoredSnapshot();
+    const deployment = (stored.snapshot.deployments ?? []).find(
+      (item) => item.namespace === namespace && item.name === name
+    );
+    if (!deployment) {
+      return undefined;
+    }
+
+    const podKeys = getDeploymentPodKeys(stored.snapshot, namespace, name);
+    const degradedSources = [...stored.snapshot.degradedSources];
+    const [podCpuSeries, podMemorySeries] = await Promise.all([
+      safeRangeVector(
+        this.prometheus,
+        `sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{container!="",image!=""}[5m]))`,
+        ["namespace", "pod"],
+        window,
+        degradedSources
+      ),
+      safeRangeVector(
+        this.prometheus,
+        `sum by (namespace, pod) (container_memory_working_set_bytes{container!="",image!=""})`,
+        ["namespace", "pod"],
+        window,
+        degradedSources
+      ),
+    ]);
+    const aggregateCpuPoints = sumSeriesByKeys(podKeys, podCpuSeries);
+    const aggregateMemoryPoints = sumSeriesByKeys(podKeys, podMemorySeries);
+    const summary = summarizeSeries(window, aggregateCpuPoints, aggregateMemoryPoints);
+
+    return {
+      deployment: {
+        key: deployment.key,
+        name: deployment.name,
+        namespace: deployment.namespace,
+      },
+      window,
+      summary,
+      cpu: {
+        aggregate: buildHistorySeries(deployment.key, "Deployment total", aggregateCpuPoints),
+        pods: podKeys.map((key) =>
+          buildHistorySeries(key, key.split("/")[1] ?? key, podCpuSeries[key] ?? [])
+        ),
+      },
+      memory: {
+        aggregate: buildHistorySeries(deployment.key, "Deployment total", aggregateMemoryPoints),
+        pods: podKeys.map((key) =>
+          buildHistorySeries(key, key.split("/")[1] ?? key, podMemorySeries[key] ?? [])
+        ),
+      },
+      degradedSources,
+    };
+  }
+
+  async getNodeMetrics(
+    name: string,
+    window: MetricWindow = "7d"
+  ): Promise<NodeMetricsResponse | undefined> {
+    const stored = await this.getStoredSnapshot();
+    const node = stored.snapshot.nodes.find((item) => item.name === name);
+    if (!node) {
+      return undefined;
+    }
+
+    const degradedSources = [...stored.snapshot.degradedSources];
+    const [nodeCpuSeries, nodeMemorySeries] = await Promise.all([
+      safeRangeVector(
+        this.prometheus,
+        `sum by (node) (rate(container_cpu_usage_seconds_total{container!="",image!=""}[5m]))`,
+        ["node", "instance"],
+        window,
+        degradedSources
+      ),
+      safeRangeVector(
+        this.prometheus,
+        `sum by (node) (container_memory_working_set_bytes{container!="",image!=""})`,
+        ["node", "instance"],
+        window,
+        degradedSources
+      ),
+    ]);
+
+    const cpuPoints = nodeCpuSeries[name] ?? [];
+    const memoryPoints = nodeMemorySeries[name] ?? [];
+
+    return {
+      node: {
+        name,
+      },
+      window,
+      summary: summarizeSeries(window, cpuPoints, memoryPoints),
+      cpu: buildHistorySeries(name, "CPU do node", cpuPoints),
+      memory: buildHistorySeries(name, "Memoria do node", memoryPoints),
+      degradedSources,
     };
   }
 
@@ -318,6 +468,82 @@ export class LiveAnalysisService implements AnalysisService {
 
     void this.runAnalysis().catch(() => undefined);
   }
+
+  private async buildNodeHistorySummary(
+    stored: StoredSnapshot,
+    window: MetricWindow,
+  ) {
+    const degradedSources = [...stored.snapshot.degradedSources];
+    const [nodeCpuSeries, nodeMemorySeries] = await Promise.all([
+      safeRangeVector(
+        this.prometheus,
+        `sum by (node) (rate(container_cpu_usage_seconds_total{container!="",image!=""}[5m]))`,
+        ["node", "instance"],
+        window,
+        degradedSources
+      ),
+      safeRangeVector(
+        this.prometheus,
+        `sum by (node) (container_memory_working_set_bytes{container!="",image!=""})`,
+        ["node", "instance"],
+        window,
+        degradedSources
+      ),
+    ]);
+
+    return {
+      history: Object.fromEntries(
+        Object.keys({ ...nodeCpuSeries, ...nodeMemorySeries }).map((nodeName) => [
+          nodeName,
+          summarizeSeries(
+            window,
+            nodeCpuSeries[nodeName] ?? [],
+            nodeMemorySeries[nodeName] ?? [],
+          ),
+        ]),
+      ),
+      degradedSources,
+    };
+  }
+
+  private async buildDeploymentHistorySummary(
+    stored: StoredSnapshot,
+    window: MetricWindow,
+  ) {
+    const degradedSources = [...stored.snapshot.degradedSources];
+    const [podCpuSeries, podMemorySeries] = await Promise.all([
+      safeRangeVector(
+        this.prometheus,
+        `sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{container!="",image!=""}[5m]))`,
+        ["namespace", "pod"],
+        window,
+        degradedSources
+      ),
+      safeRangeVector(
+        this.prometheus,
+        `sum by (namespace, pod) (container_memory_working_set_bytes{container!="",image!=""})`,
+        ["namespace", "pod"],
+        window,
+        degradedSources
+      ),
+    ]);
+
+    return {
+      history: Object.fromEntries(
+        (stored.snapshot.deployments ?? []).map((deployment) => {
+          const podKeys = getDeploymentPodKeys(
+            stored.snapshot,
+            deployment.namespace,
+            deployment.name,
+          );
+          const cpuPoints = sumSeriesByKeys(podKeys, podCpuSeries);
+          const memoryPoints = sumSeriesByKeys(podKeys, podMemorySeries);
+          return [deployment.key, summarizeSeries(window, cpuPoints, memoryPoints)];
+        }),
+      ),
+      degradedSources,
+    };
+  }
 }
 
 function emptyMetrics() {
@@ -468,4 +694,44 @@ function needsSnapshotRefresh(stored: StoredSnapshot): boolean {
   }
 
   return false;
+}
+
+async function safeRangeVector(
+  prometheus: PrometheusConnector,
+  query: string,
+  labels: string[],
+  window: MetricWindow,
+  degradedSources: string[]
+) {
+  try {
+    return await prometheus.rangeVector(query, labels, window);
+  } catch (error) {
+    degradedSources.push(`prometheus: ${toErrorMessage(error)}`);
+    return {};
+  }
+}
+
+function getDeploymentPodKeys(
+  snapshot: StoredSnapshot["snapshot"],
+  namespace: string,
+  name: string
+) {
+  const deploymentKey = `Deployment:${namespace}/${name}`;
+  const replicaSetKeys = new Set(
+    snapshot.relations
+      .filter(
+        (relation) => relation.type === "owns" && relation.fromKey === deploymentKey && relation.toKey.startsWith("ReplicaSet:")
+      )
+      .map((relation) => relation.toKey)
+  );
+
+  return snapshot.relations
+    .filter(
+      (relation) =>
+        relation.type === "owns" &&
+        replicaSetKeys.has(relation.fromKey) &&
+        relation.toKey.startsWith("Pod:")
+    )
+    .map((relation) => relation.toKey.replace(/^Pod:/, ""))
+    .sort((left, right) => left.localeCompare(right));
 }
