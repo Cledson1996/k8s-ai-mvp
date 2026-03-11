@@ -1,0 +1,21 @@
+{
+  "name": "k8s-ai-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace @k8s-ai-mvp/api\" \"npm run dev --workspace @k8s-ai-mvp/web\"",
+    "dev:api": "npm run dev --workspace @k8s-ai-mvp/api",
+    "dev:web": "npm run dev --workspace @k8s-ai-mvp/web",
+    "build": "npm run build --workspace @k8s-ai-mvp/shared && npm run build --workspace @k8s-ai-mvp/api && npm run build --workspace @k8s-ai-mvp/web",
+    "test": "npm run test --workspace @k8s-ai-mvp/shared && npm run test --workspace @k8s-ai-mvp/api && npm run test --workspace @k8s-ai-mvp/web",
+    "lint": "npm run lint --workspace @k8s-ai-mvp/api && npm run lint --workspace @k8s-ai-mvp/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  }
+}

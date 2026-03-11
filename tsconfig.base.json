@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@k8s-ai-mvp/shared": [
+        "packages/shared/src/index.ts"
+      ],
+      "@k8s-ai-mvp/shared/*": [
+        "packages/shared/src/*"
+      ]
+    }
+  }
+}
