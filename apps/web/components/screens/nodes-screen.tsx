@@ -12,6 +12,7 @@ import {
   formatPercent,
 } from "../../lib/format";
 import { NodeHistoryModal } from "../ui/history-metrics-modal";
+import { NodeAnalysisDrawer } from "../ui/node-analysis-drawer";
 import { SectionCard } from "../ui/section-card";
 import { StateBanner } from "../ui/state-banner";
 
@@ -56,6 +57,7 @@ export function NodesScreen({
 function NodeCard({ node }: { node: NodeHealth }) {
   const [expanded, setExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const workloadList = node.workloads ?? node.topWorkloads ?? [];
   const cpuCapacity = node.capacity?.cpu ?? {};
   const memoryCapacity = node.capacity?.memory ?? {};
@@ -129,6 +131,13 @@ function NodeCard({ node }: { node: NodeHealth }) {
         >
           Abrir node
         </Link>
+        <button
+          type="button"
+          onClick={() => setShowAnalysis(true)}
+          className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          Analisar node
+        </button>
         <button
           type="button"
           onClick={() => setShowHistory(true)}
@@ -255,6 +264,12 @@ function NodeCard({ node }: { node: NodeHealth }) {
         <NodeHistoryModal
           name={node.name}
           onClose={() => setShowHistory(false)}
+        />
+      ) : null}
+      {showAnalysis ? (
+        <NodeAnalysisDrawer
+          name={node.name}
+          onClose={() => setShowAnalysis(false)}
         />
       ) : null}
     </article>

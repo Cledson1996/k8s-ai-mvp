@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Breadcrumbs } from "../ui/breadcrumbs";
 import { SectionCard } from "../ui/section-card";
 import { ModalPortal } from "../ui/modal-portal";
+import { NodeAnalysisDrawer } from "../ui/node-analysis-drawer";
 import { StateBanner } from "../ui/state-banner";
 import { HealthPill } from "../ui/explorer-pill";
 import { SeverityPill, SourcePill } from "../ui/status-pill";
@@ -25,6 +26,7 @@ export function ResourceDetailScreen({
   degradedSources: string[];
 }) {
   const [showYaml, setShowYaml] = useState(false);
+  const [showNodeAnalysis, setShowNodeAnalysis] = useState(false);
   const { resource } = detail;
   const references = detail.references ?? [];
   const insights = detail.insights ?? [];
@@ -79,6 +81,15 @@ export function ResourceDetailScreen({
             <Metric label="Memoria" value={formatMemory(detail.metrics.memoryBytes)} />
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {resource.kind === "Node" ? (
+              <button
+                type="button"
+                onClick={() => setShowNodeAnalysis(true)}
+                className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Analisar node
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setShowYaml(true)}
@@ -505,6 +516,12 @@ export function ResourceDetailScreen({
           title={`${resource.kind} ${resource.name}`}
           yaml={detail.manifestYaml}
           onClose={() => setShowYaml(false)}
+        />
+      ) : null}
+      {showNodeAnalysis && resource.kind === "Node" ? (
+        <NodeAnalysisDrawer
+          name={resource.name}
+          onClose={() => setShowNodeAnalysis(false)}
         />
       ) : null}
     </div>

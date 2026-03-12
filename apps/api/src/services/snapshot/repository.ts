@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import type {
   ClusterSnapshot,
   DeploymentAnalysisResponse,
+  NodeAnalysisResponse,
   ResourceDetail,
   ResourceHistoryEntry,
   SnapshotDiff,
@@ -78,6 +79,11 @@ export class SnapshotRepository {
         deployment_key TEXT PRIMARY KEY,
         namespace TEXT NOT NULL,
         name TEXT NOT NULL,
+        generated_at TEXT NOT NULL,
+        data TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS node_analyses (
+        node_name TEXT PRIMARY KEY,
         generated_at TEXT NOT NULL,
         data TEXT NOT NULL
       );
@@ -193,6 +199,31 @@ export class SnapshotRepository {
     this.db
       .prepare("DELETE FROM deployment_analyses WHERE deployment_key = ?")
       .run(deploymentKey);
+  }
+
+  getNodeAnalysis(nodeName: string): NodeAnalysisResponse | undefined {
+    const row = this.db
+      .prepare("SELECT data FROM node_analyses WHERE node_name = ?")
+      .get(nodeName) as { data: string } | undefined;
+    return row ? (JSON.parse(row.data) as NodeAnalysisResponse) : undefined;
+  }
+
+  saveNodeAnalysis(analysis: NodeAnalysisResponse) {
+    this.db
+      .prepare(
+        `
+        INSERT OR REPLACE INTO node_analyses (
+          node_name, generated_at, data
+        ) VALUES (?, ?, ?)
+      `,
+      )
+      .run(analysis.node.name, analysis.generatedAt, JSON.stringify(analysis));
+  }
+
+  deleteNodeAnalysis(nodeName: string) {
+    this.db
+      .prepare("DELETE FROM node_analyses WHERE node_name = ?")
+      .run(nodeName);
   }
 
   listSnapshots(): SnapshotSummary[] {

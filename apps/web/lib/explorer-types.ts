@@ -1,4 +1,4 @@
-import type { Issue } from "@k8s-ai-mvp/shared";
+import type { Issue, Severity } from "@k8s-ai-mvp/shared";
 
 export type ResourceHealth = "healthy" | "warning" | "critical" | "unknown";
 
@@ -404,6 +404,71 @@ export interface DeploymentAnalysisResponse {
   reviewCommands: string[];
   suggestedYamlPatches: SuggestedYamlPatch[];
   relatedResources: DeploymentAnalysisRelatedResource[];
+}
+
+export interface NodeAnalysisScorecard {
+  category: DeploymentAnalysisCategory;
+  label: string;
+  risk: DeploymentAnalysisRisk;
+  summary: string;
+}
+
+export interface NodeAnalysisFinding {
+  id: string;
+  category: DeploymentAnalysisCategory;
+  severity: Severity;
+  title: string;
+  resource: {
+    kind: string;
+    name: string;
+    namespace?: string;
+  };
+  evidence: Array<{
+    label: string;
+    value: string;
+  }>;
+  impact: string;
+  recommendation: string;
+}
+
+export interface NodeImprovementSuggestion {
+  id: string;
+  title: string;
+  priority: Severity;
+  summary: string;
+  resource?: {
+    kind: string;
+    name: string;
+    namespace?: string;
+  };
+}
+
+export interface NodeAnalysisRelatedResource {
+  key: string;
+  kind: string;
+  name: string;
+  namespace?: string;
+  role: string;
+  status?: string;
+  summary: string;
+  manifestYaml?: string;
+}
+
+export interface NodeAnalysisResponse {
+  node: {
+    name: string;
+  };
+  generatedAt: string;
+  usedSources: string[];
+  degradedSources: string[];
+  executiveSummary: string;
+  overallRisk: DeploymentAnalysisRisk;
+  scorecards: NodeAnalysisScorecard[];
+  findings: NodeAnalysisFinding[];
+  improvements: NodeImprovementSuggestion[];
+  reviewCommands: string[];
+  suggestedYamlPatches: SuggestedYamlPatch[];
+  relatedResources: NodeAnalysisRelatedResource[];
 }
 
 export interface NodeMetricsResponse {

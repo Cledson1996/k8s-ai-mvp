@@ -13,12 +13,17 @@ import {
   LiveDeploymentAnalysisService,
   type DeploymentAnalysisService,
 } from "./services/deployment-analysis/service.js";
+import {
+  LiveNodeAnalysisService,
+  type NodeAnalysisService,
+} from "./services/node-analysis/service.js";
 import { SnapshotRepository } from "./services/snapshot/repository.js";
 
 export interface AppServices {
   analysisService: AnalysisService;
   chatService: ChatService;
   deploymentAnalysisService: DeploymentAnalysisService;
+  nodeAnalysisService: NodeAnalysisService;
 }
 
 export function buildServices(config: AppConfig = getConfig()): AppServices {
@@ -34,6 +39,11 @@ export function buildServices(config: AppConfig = getConfig()): AppServices {
     analysisService,
     chatService: new LiveChatService(config),
     deploymentAnalysisService: new LiveDeploymentAnalysisService(
+      config,
+      analysisService,
+      repository,
+    ),
+    nodeAnalysisService: new LiveNodeAnalysisService(
       config,
       analysisService,
       repository,
@@ -209,6 +219,44 @@ export async function createApp(services: AppServices = buildServices()) {
     }
 
     return result;
+  });
+
+  app.post("/api/nodes/:name/analyze", async (request, reply) => {
+    const { name } = request.params as { name: string };
+    const result = await services.nodeAnalysisService.analyzeNode(name);
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "node analysis not found",
+      };
+    }
+    return result;
+  });
+
+  app.get("/api/nodes/:name/analyze", async (request, reply) => {
+    const { name } = request.params as { name: string };
+    const result = await services.nodeAnalysisService.getSavedNodeAnalysis(name);
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "node analysis not found",
+      };
+    }
+    return result;
+  });
+
+  app.delete("/api/nodes/:name/analyze", async (request, reply) => {
+    const { name } = request.params as { name: string };
+    const removed = await services.nodeAnalysisService.clearNodeAnalysis(name);
+    if (!removed) {
+      reply.code(404);
+      return {
+        error: "node analysis not found",
+      };
+    }
+    return {
+      ok: true,
+    };
   });
 
   app.get("/api/workloads", async () =>
