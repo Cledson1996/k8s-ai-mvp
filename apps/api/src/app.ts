@@ -17,6 +17,10 @@ import {
   LiveNodeAnalysisService,
   type NodeAnalysisService,
 } from "./services/node-analysis/service.js";
+import {
+  LiveHealthCenterService,
+  type HealthCenterService,
+} from "./services/health-center/service.js";
 import { SnapshotRepository } from "./services/snapshot/repository.js";
 
 export interface AppServices {
@@ -24,6 +28,7 @@ export interface AppServices {
   chatService: ChatService;
   deploymentAnalysisService: DeploymentAnalysisService;
   nodeAnalysisService: NodeAnalysisService;
+  healthCenterService: HealthCenterService;
 }
 
 export function buildServices(config: AppConfig = getConfig()): AppServices {
@@ -45,6 +50,10 @@ export function buildServices(config: AppConfig = getConfig()): AppServices {
     ),
     nodeAnalysisService: new LiveNodeAnalysisService(
       config,
+      analysisService,
+      repository,
+    ),
+    healthCenterService: new LiveHealthCenterService(
       analysisService,
       repository,
     ),
@@ -120,6 +129,14 @@ export async function createApp(services: AppServices = buildServices()) {
       degradedSources: result.degradedSources,
     };
   });
+
+  app.get("/api/health-center", async () =>
+    services.healthCenterService.getHealthCenter(),
+  );
+
+  app.post("/api/health-center/run", async () =>
+    services.healthCenterService.runHealthCenter(),
+  );
 
   app.post("/api/analysis/run", async () =>
     services.analysisService.runAnalysis(),

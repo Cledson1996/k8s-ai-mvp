@@ -6,6 +6,11 @@ import clsx from "clsx";
 
 const navigation = [
   { href: "/", label: "Overview", caption: "Saude geral" },
+  {
+    href: "/health-center",
+    label: "Health Center",
+    caption: "Criticos, riscos e cleanup",
+  },
   { href: "/explorer", label: "Explorer", caption: "Namespaces e recursos" },
   {
     href: "/deployments",

@@ -656,6 +656,77 @@ export interface NodeMetricsResponse {
   degradedSources: string[];
 }
 
+export type HealthCenterTrend = "new" | "worsened" | "stable" | "improved";
+
+export interface HealthCenterRelatedResource {
+  kind: ResourceKind;
+  name: string;
+  namespace?: string;
+  status?: string;
+  manifestYaml?: string;
+}
+
+export interface HealthCenterAnalysisTarget {
+  type: "deployment" | "node";
+  name: string;
+  namespace?: string;
+}
+
+export interface HealthCenterCard {
+  id: string;
+  title: string;
+  severity: Severity;
+  category: IssueCategory;
+  resource: ResourceRef;
+  summary: string;
+  whyNow: string;
+  evidence: IssueEvidence[];
+  recommendedAction: string;
+  suggestedCommands: string[];
+  relatedResources: HealthCenterRelatedResource[];
+  changedRecently: boolean;
+  startedAt?: string;
+  trend: HealthCenterTrend;
+  manifestYaml?: string;
+  analysisTarget?: HealthCenterAnalysisTarget;
+  scope: "application" | "platform";
+}
+
+export interface HealthCenterSection {
+  id: "criticalNow" | "emergingProblems" | "riskWatch" | "cleanupBacklog";
+  title: string;
+  description: string;
+  cards: HealthCenterCard[];
+}
+
+export interface HealthCenterDiffSummary {
+  snapshotId: string;
+  previousSnapshotId?: string;
+  previousCollectedAt?: string;
+  added: number;
+  removed: number;
+  changed: number;
+}
+
+export interface HealthCenterSummary {
+  criticalCount: number;
+  emergingCount: number;
+  cleanupCount: number;
+  nodesUnderPressure: number;
+  degradedDeployments: number;
+}
+
+export interface HealthCenterResponse {
+  generatedAt: string;
+  degradedSources: string[];
+  summary: HealthCenterSummary;
+  diffSummary: HealthCenterDiffSummary;
+  criticalNow: HealthCenterSection;
+  emergingProblems: HealthCenterSection;
+  riskWatch: HealthCenterSection;
+  cleanupBacklog: HealthCenterSection;
+}
+
 export interface WorkloadStatusCount {
   status: string;
   count: number;

@@ -1,6 +1,7 @@
 import "server-only";
 import type {
   ClusterOverview,
+  HealthCenterResponse,
   DeploymentsResponse as BackendDeploymentsResponse,
   DeploymentInventory as BackendDeploymentInventory,
   Issue,
@@ -101,6 +102,48 @@ interface IssuesResponse {
   degradedSources: string[];
 }
 
+const emptyHealthCenter: HealthCenterResponse = {
+  generatedAt: new Date(0).toISOString(),
+  degradedSources: [unavailableSource],
+  summary: {
+    criticalCount: 0,
+    emergingCount: 0,
+    cleanupCount: 0,
+    nodesUnderPressure: 0,
+    degradedDeployments: 0,
+  },
+  diffSummary: {
+    snapshotId: "unavailable",
+    added: 0,
+    removed: 0,
+    changed: 0,
+  },
+  criticalNow: {
+    id: "criticalNow",
+    title: "Criticos Agora",
+    description: "Sem dados.",
+    cards: [],
+  },
+  emergingProblems: {
+    id: "emergingProblems",
+    title: "Novos Problemas",
+    description: "Sem dados.",
+    cards: [],
+  },
+  riskWatch: {
+    id: "riskWatch",
+    title: "Riscos para acompanhar",
+    description: "Sem dados.",
+    cards: [],
+  },
+  cleanupBacklog: {
+    id: "cleanupBacklog",
+    title: "Lixo operacional e inconsistencias",
+    description: "Sem dados.",
+    cards: [],
+  },
+};
+
 export async function getOverviewPageData(): Promise<{
   overview: ClusterOverview;
   degradedSources: string[];
@@ -192,6 +235,10 @@ export async function getChatPageData(): Promise<{
     suggestedQuestions: defaultSuggestedQuestions,
     issues: response.issues,
   };
+}
+
+export async function getHealthCenterPageData(): Promise<HealthCenterResponse> {
+  return fetchJson<HealthCenterResponse>("/api/health-center", emptyHealthCenter);
 }
 
 export async function getExplorerLandingData(): Promise<{
