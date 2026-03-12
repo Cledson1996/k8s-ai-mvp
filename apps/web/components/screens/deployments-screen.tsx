@@ -8,6 +8,7 @@ import {
   formatMemoryCompact,
 } from "../../lib/format";
 import { buildResourceHref } from "../../lib/routes";
+import { DeploymentAnalysisDrawer } from "../ui/deployment-analysis-drawer";
 import { SectionCard } from "../ui/section-card";
 import { StateBanner } from "../ui/state-banner";
 import { HealthPill } from "../ui/explorer-pill";
@@ -139,6 +140,7 @@ export function DeploymentsScreen({
 function DeploymentCard({ deployment }: { deployment: DeploymentInventory }) {
   const [expanded, setExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const services = deployment.exposure?.services ?? [];
   const ingresses = deployment.exposure?.ingresses ?? [];
 
@@ -207,6 +209,13 @@ function DeploymentCard({ deployment }: { deployment: DeploymentInventory }) {
             className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
             Ver grafico
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAnalysis(true)}
+            className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Analisar deployment
           </button>
           <button
             type="button"
@@ -387,6 +396,14 @@ function DeploymentCard({ deployment }: { deployment: DeploymentInventory }) {
           name={deployment.name}
           namespace={deployment.namespace}
           onClose={() => setShowHistory(false)}
+        />
+      ) : null}
+
+      {showAnalysis ? (
+        <DeploymentAnalysisDrawer
+          name={deployment.name}
+          namespace={deployment.namespace}
+          onClose={() => setShowAnalysis(false)}
         />
       ) : null}
     </article>

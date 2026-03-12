@@ -9,24 +9,35 @@ import {
   type AnalysisService,
 } from "./services/analysis/service.js";
 import { LiveChatService, type ChatService } from "./services/chat/service.js";
+import {
+  LiveDeploymentAnalysisService,
+  type DeploymentAnalysisService,
+} from "./services/deployment-analysis/service.js";
 import { SnapshotRepository } from "./services/snapshot/repository.js";
 
 export interface AppServices {
   analysisService: AnalysisService;
   chatService: ChatService;
+  deploymentAnalysisService: DeploymentAnalysisService;
 }
 
 export function buildServices(config: AppConfig = getConfig()): AppServices {
+  const repository = new SnapshotRepository(config.SQLITE_PATH);
   const analysisService = new LiveAnalysisService(
     new LiveKubernetesConnector(config),
     new LivePrometheusConnector(config),
     new LiveK8sGptConnector(config),
-    new SnapshotRepository(config.SQLITE_PATH),
+    repository,
   );
 
   return {
     analysisService,
     chatService: new LiveChatService(config),
+    deploymentAnalysisService: new LiveDeploymentAnalysisService(
+      config,
+      analysisService,
+      repository,
+    ),
   };
 }
 
@@ -129,6 +140,56 @@ export async function createApp(services: AppServices = buildServices()) {
     }
 
     return result;
+  });
+
+  app.post("/api/deployments/:namespace/:name/analyze", async (request, reply) => {
+    const { namespace, name } = request.params as { namespace: string; name: string };
+    const result = await services.deploymentAnalysisService.analyzeDeployment(
+      namespace,
+      name,
+    );
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "deployment analysis not found",
+      };
+    }
+
+    return result;
+  });
+
+  app.get("/api/deployments/:namespace/:name/analyze", async (request, reply) => {
+    const { namespace, name } = request.params as { namespace: string; name: string };
+    const result = await services.deploymentAnalysisService.getSavedDeploymentAnalysis(
+      namespace,
+      name,
+    );
+    if (!result) {
+      reply.code(404);
+      return {
+        error: "deployment analysis not found",
+      };
+    }
+
+    return result;
+  });
+
+  app.delete("/api/deployments/:namespace/:name/analyze", async (request, reply) => {
+    const { namespace, name } = request.params as { namespace: string; name: string };
+    const removed = await services.deploymentAnalysisService.clearDeploymentAnalysis(
+      namespace,
+      name,
+    );
+    if (!removed) {
+      reply.code(404);
+      return {
+        error: "deployment analysis not found",
+      };
+    }
+
+    return {
+      ok: true,
+    };
   });
 
   app.get("/api/nodes/metrics", async (request) => {

@@ -36,18 +36,39 @@ import type {
   ResourceScheduling,
   SnapshotDiff,
 } from "./explorer-types";
-import {
-  getSampleNamespace,
-  getSampleResourceDetail,
-  getSampleSnapshotDiff,
-  sampleAnalysisResponse,
-  sampleChatPrompts,
-  sampleNamespaces,
-  sampleSnapshots,
-} from "./sample-data";
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const unavailableSource = "api unavailable";
+const emptyTimestamp = new Date(0).toISOString();
+const defaultSuggestedQuestions = [
+  "Quais pods estao reiniciando mais agora?",
+  "Quais namespaces concentram mais memoria?",
+  "Tem deployment sem requests ou limits?",
+  "Quais nodes estao mais carregados?",
+];
+
+const emptyOverview: ClusterOverview = {
+  clusterName: "indisponivel",
+  collectedAt: emptyTimestamp,
+  nodeCount: 0,
+  namespaceCount: 0,
+  podCount: 0,
+  unhealthyPodCount: 0,
+  totalRestarts: 0,
+  usage: {},
+  topNamespaces: [],
+  topRestarts: [],
+  highlightedIssues: [],
+};
+
+const emptySnapshotSummary = {
+  id: "unavailable",
+  clusterName: "indisponivel",
+  collectedAt: emptyTimestamp,
+  resourceCount: 0,
+  issueCount: 0,
+};
 
 async function fetchJson<T>(path: string, fallback: T): Promise<T> {
   try {
@@ -85,8 +106,8 @@ export async function getOverviewPageData(): Promise<{
   degradedSources: string[];
 }> {
   const response = await fetchJson<OverviewResponse>("/api/overview", {
-    overview: sampleAnalysisResponse.snapshot.overview,
-    degradedSources: sampleAnalysisResponse.degradedSources,
+    overview: emptyOverview,
+    degradedSources: [unavailableSource],
   });
 
   return {
@@ -148,8 +169,8 @@ export async function getIssuesPageData(): Promise<{
   degradedSources: string[];
 }> {
   const response = await fetchJson<IssuesResponse>("/api/issues", {
-    issues: sampleAnalysisResponse.snapshot.issues,
-    degradedSources: sampleAnalysisResponse.degradedSources,
+    issues: [],
+    degradedSources: [unavailableSource],
   });
 
   return {
@@ -163,12 +184,12 @@ export async function getChatPageData(): Promise<{
   issues: Issue[];
 }> {
   const response = await fetchJson<IssuesResponse>("/api/issues", {
-    issues: sampleAnalysisResponse.snapshot.issues,
-    degradedSources: sampleAnalysisResponse.degradedSources,
+    issues: [],
+    degradedSources: [unavailableSource],
   });
 
   return {
-    suggestedQuestions: sampleChatPrompts,
+    suggestedQuestions: defaultSuggestedQuestions,
     issues: response.issues,
   };
 }
@@ -181,33 +202,28 @@ export async function getExplorerLandingData(): Promise<{
   const [namespacesResponse, snapshotsResponse] = await Promise.all([
     fetchJson<BackendNamespacesResponse>("/api/namespaces", {
       namespaces: [],
-      snapshot: {
-        id: "fallback",
-        clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
-        collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
-        resourceCount: 0,
-        issueCount: 0,
-      },
-      degradedSources: sampleAnalysisResponse.degradedSources,
+      snapshot: emptySnapshotSummary,
+      degradedSources: [unavailableSource],
     }),
     fetchJson<BackendSnapshotsResponse>("/api/snapshots", {
       snapshots: [],
     }),
   ]);
 
-  const namespaces =
-    namespacesResponse.namespaces.length > 0
-      ? namespacesResponse.namespaces.map(toNamespaceInventory)
-      : sampleNamespaces;
-  const snapshots =
-    snapshotsResponse.snapshots.length > 0
-      ? toClusterSnapshots(snapshotsResponse.snapshots)
-      : sampleSnapshots;
+  const namespaces = namespacesResponse.namespaces.map(toNamespaceInventory);
+  const snapshots = toClusterSnapshots(snapshotsResponse.snapshots);
 
   return {
     namespaces,
     snapshots,
-    degradedSources: Array.from(new Set(namespacesResponse.degradedSources)),
+    degradedSources: Array.from(
+      new Set([
+        ...namespacesResponse.degradedSources,
+        ...(snapshots.length === 0 && namespaces.length === 0
+          ? [unavailableSource]
+          : []),
+      ]),
+    ),
   };
 }
 
@@ -221,13 +237,7 @@ export async function getNamespacePageData(name: string): Promise<{
       `/api/namespaces/${encodeURIComponent(name)}`,
       {
         namespace: undefined as never,
-        snapshot: {
-          id: "fallback",
-          clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
-          collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
-          resourceCount: 0,
-          issueCount: 0,
-        },
+        snapshot: emptySnapshotSummary,
       },
     ),
     fetchJson<BackendSnapshotsResponse>("/api/snapshots", {
@@ -238,12 +248,9 @@ export async function getNamespacePageData(name: string): Promise<{
   return {
     namespace: namespaceResponse.namespace
       ? toNamespaceInventory(namespaceResponse.namespace)
-      : getSampleNamespace(name),
-    snapshots:
-      snapshotsResponse.snapshots.length > 0
-        ? toClusterSnapshots(snapshotsResponse.snapshots)
-        : sampleSnapshots,
-    degradedSources: [],
+      : createEmptyNamespace(name),
+    snapshots: toClusterSnapshots(snapshotsResponse.snapshots),
+    degradedSources: namespaceResponse.namespace ? [] : [unavailableSource],
   };
 }
 
@@ -264,34 +271,22 @@ export async function getResourceDetailPageData(
       `/api/resources/${encodedKind}/${encodedNamespace}/${encodedName}`,
       {
         resource: undefined as never,
-        snapshot: {
-          id: "fallback",
-          clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
-          collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
-          resourceCount: 0,
-          issueCount: 0,
-        },
+        snapshot: emptySnapshotSummary,
       },
     ),
     fetchJson<BackendResourceRelationsResponse>(
       `/api/resources/${encodedKind}/${encodedNamespace}/${encodedName}/relations`,
       {
         relations: [],
-        snapshot: {
-          id: "fallback",
-          clusterName: sampleAnalysisResponse.snapshot.overview.clusterName,
-          collectedAt: sampleAnalysisResponse.snapshot.overview.collectedAt,
-          resourceCount: 0,
-          issueCount: 0,
-        },
+        snapshot: emptySnapshotSummary,
       },
     ),
   ]);
 
   if (!resourceResponse.resource) {
     return {
-      detail: getSampleResourceDetail(kind, namespace, name),
-      degradedSources: sampleAnalysisResponse.degradedSources,
+      detail: createEmptyResourceDetail(kind, namespace, name),
+      degradedSources: [unavailableSource],
     };
   }
 
@@ -326,11 +321,9 @@ export async function getHistoryPageData(): Promise<{
   });
 
   return {
-    snapshots:
-      response.snapshots.length > 0
-        ? toClusterSnapshots(response.snapshots)
-        : sampleSnapshots,
-    degradedSources: [],
+    snapshots: toClusterSnapshots(response.snapshots),
+    degradedSources:
+      response.snapshots.length > 0 ? [] : [unavailableSource],
   };
 }
 
@@ -357,12 +350,67 @@ export async function getSnapshotDiffPageData(
   return {
     diff: diffResponse.diff
       ? toSnapshotDiff(diffResponse.diff)
-      : getSampleSnapshotDiff(snapshotId, previousId),
-    snapshots:
-      snapshotsResponse.snapshots.length > 0
-        ? toClusterSnapshots(snapshotsResponse.snapshots)
-        : sampleSnapshots,
-    degradedSources: [],
+      : createEmptySnapshotDiff(snapshotId, previousId),
+    snapshots: toClusterSnapshots(snapshotsResponse.snapshots),
+    degradedSources: diffResponse.diff ? [] : [unavailableSource],
+  };
+}
+
+function createEmptyNamespace(name: string): NamespaceInventory {
+  return {
+    name,
+    status: "unknown",
+    summary: "Nenhum dado real do namespace foi carregado nesta coleta.",
+    podCount: 0,
+    resourceCount: 0,
+    unhealthyResourceCount: 0,
+    issueCount: 0,
+    kinds: [],
+    resources: [],
+    issues: [],
+  };
+}
+
+function createEmptyResourceDetail(
+  kind: string,
+  namespace: string,
+  name: string,
+): ResourceDetail {
+  return {
+    resource: {
+      kind: kind as ResourceKind,
+      name,
+      namespace,
+      status: "Unknown",
+      health: "unknown",
+      summary: "O recurso nao foi retornado pela API nesta coleta.",
+      issueCount: 0,
+      scope: namespace === "_cluster" ? "platform" : "application",
+    },
+    metrics: {},
+    issues: [],
+    suggestedCommands: [],
+    relations: [],
+    history: [],
+    insights: [],
+    references: [],
+  };
+}
+
+function createEmptySnapshotDiff(
+  snapshotId: string,
+  previousSnapshotId: string,
+): SnapshotDiff {
+  return {
+    currentSnapshotId: snapshotId,
+    previousSnapshotId,
+    generatedAt: emptyTimestamp,
+    summary: {
+      added: 0,
+      removed: 0,
+      changed: 0,
+    },
+    changes: [],
   };
 }
 
@@ -584,8 +632,12 @@ function toDeploymentInventory(
     resilience: deployment.resilience
       ? {
           ...deployment.resilience,
-          podDisruptionBudgets:
-            deployment.resilience.podDisruptionBudgets ?? [],
+          podDisruptionBudgets: (
+            deployment.resilience.podDisruptionBudgets ?? []
+          ).map((pdb) => ({
+            ...pdb,
+            namespace: pdb.namespace ?? deployment.namespace,
+          })),
           risks: deployment.resilience.risks ?? [],
         }
       : undefined,

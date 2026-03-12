@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import type {
   ClusterSnapshot,
+  DeploymentAnalysisResponse,
   ResourceDetail,
   ResourceHistoryEntry,
   SnapshotDiff,
@@ -72,6 +73,13 @@ export class SnapshotRepository {
         relation_type TEXT NOT NULL,
         label TEXT NOT NULL,
         PRIMARY KEY (snapshot_id, from_key, to_key, relation_type)
+      );
+      CREATE TABLE IF NOT EXISTS deployment_analyses (
+        deployment_key TEXT PRIMARY KEY,
+        namespace TEXT NOT NULL,
+        name TEXT NOT NULL,
+        generated_at TEXT NOT NULL,
+        data TEXT NOT NULL
       );
     `);
   }
@@ -152,6 +160,39 @@ export class SnapshotRepository {
       .prepare("SELECT data FROM snapshots WHERE id = ?")
       .get(id) as { data: string } | undefined;
     return row ? (JSON.parse(row.data) as StoredSnapshot) : undefined;
+  }
+
+  getDeploymentAnalysis(
+    deploymentKey: string,
+  ): DeploymentAnalysisResponse | undefined {
+    const row = this.db
+      .prepare("SELECT data FROM deployment_analyses WHERE deployment_key = ?")
+      .get(deploymentKey) as { data: string } | undefined;
+    return row ? (JSON.parse(row.data) as DeploymentAnalysisResponse) : undefined;
+  }
+
+  saveDeploymentAnalysis(analysis: DeploymentAnalysisResponse) {
+    this.db
+      .prepare(
+        `
+        INSERT OR REPLACE INTO deployment_analyses (
+          deployment_key, namespace, name, generated_at, data
+        ) VALUES (?, ?, ?, ?, ?)
+      `,
+      )
+      .run(
+        analysis.deployment.key,
+        analysis.deployment.namespace,
+        analysis.deployment.name,
+        analysis.generatedAt,
+        JSON.stringify(analysis),
+      );
+  }
+
+  deleteDeploymentAnalysis(deploymentKey: string) {
+    this.db
+      .prepare("DELETE FROM deployment_analyses WHERE deployment_key = ?")
+      .run(deploymentKey);
   }
 
   listSnapshots(): SnapshotSummary[] {

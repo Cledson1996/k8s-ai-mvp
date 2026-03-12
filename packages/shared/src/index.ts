@@ -516,6 +516,81 @@ export interface DeploymentMetricsResponse {
   degradedSources: string[];
 }
 
+export type DeploymentAnalysisRisk = "healthy" | "warning" | "critical";
+
+export type DeploymentAnalysisCategory =
+  | "rollout"
+  | "availability"
+  | "autoscaling"
+  | "capacity"
+  | "networking"
+  | "configuration"
+  | "security"
+  | "cleanup";
+
+export interface DeploymentAnalysisScorecard {
+  category: DeploymentAnalysisCategory;
+  label: string;
+  risk: DeploymentAnalysisRisk;
+  summary: string;
+}
+
+export interface DeploymentAnalysisFinding {
+  id: string;
+  category: DeploymentAnalysisCategory;
+  severity: Severity;
+  title: string;
+  resource: ResourceRef;
+  evidence: IssueEvidence[];
+  impact: string;
+  recommendation: string;
+}
+
+export interface DeploymentImprovementSuggestion {
+  id: string;
+  title: string;
+  priority: Severity;
+  summary: string;
+  resource?: ResourceRef;
+}
+
+export interface SuggestedYamlPatch {
+  resource: ResourceRef;
+  reason: string;
+  yaml: string;
+  note: string;
+}
+
+export interface DeploymentAnalysisRelatedResource {
+  key: string;
+  kind: ResourceKind;
+  name: string;
+  namespace?: string;
+  role: string;
+  status?: string;
+  summary: string;
+  manifestYaml?: string;
+}
+
+export interface DeploymentAnalysisResponse {
+  deployment: {
+    key: string;
+    name: string;
+    namespace: string;
+  };
+  generatedAt: string;
+  usedSources: string[];
+  degradedSources: string[];
+  executiveSummary: string;
+  overallRisk: DeploymentAnalysisRisk;
+  scorecards: DeploymentAnalysisScorecard[];
+  findings: DeploymentAnalysisFinding[];
+  improvements: DeploymentImprovementSuggestion[];
+  reviewCommands: string[];
+  suggestedYamlPatches: SuggestedYamlPatch[];
+  relatedResources: DeploymentAnalysisRelatedResource[];
+}
+
 export interface NodeMetricsResponse {
   node: {
     name: string;
