@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Breadcrumbs } from "../ui/breadcrumbs";
 import { SectionCard } from "../ui/section-card";
+import { ModalPortal } from "../ui/modal-portal";
 import { StateBanner } from "../ui/state-banner";
 import { HealthPill } from "../ui/explorer-pill";
 import { SeverityPill, SourcePill } from "../ui/status-pill";
@@ -558,40 +559,42 @@ function YamlModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/55 px-4 py-6 sm:py-10" onClick={onClose}>
-      <div className="mx-auto w-full max-w-5xl">
-        <div
-          className="flex max-h-[calc(100vh-3rem)] w-full flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-2xl sm:max-h-[calc(100vh-5rem)]"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-center justify-between gap-4 border-b border-black/5 px-5 py-4">
-            <div>
-              <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-slate-500">
-                Manifesto do recurso
-              </p>
-              <h3 className="mt-2 font-[var(--font-heading)] text-xl font-semibold text-ink">{title}</h3>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Fechar
-            </button>
-          </div>
-
-          <div className="overflow-auto bg-ink px-5 py-5">
-            {yaml ? (
-              <YamlCodeBlock yaml={yaml} />
-            ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/75">
-                O YAML bruto ainda nao esta disponivel para este recurso nesta coleta.
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6" onClick={onClose}>
+        <div className="w-full max-w-5xl">
+          <div
+            className="flex h-[80vh] max-h-[80vh] w-full flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-black/5 px-5 py-4">
+              <div>
+                <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-slate-500">
+                  Manifesto do recurso
+                </p>
+                <h3 className="mt-2 font-[var(--font-heading)] text-xl font-semibold text-ink">{title}</h3>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto bg-ink px-5 py-5">
+              {yaml ? (
+                <YamlCodeBlock yaml={yaml} />
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/75">
+                  O YAML bruto ainda nao esta disponivel para este recurso nesta coleta.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 

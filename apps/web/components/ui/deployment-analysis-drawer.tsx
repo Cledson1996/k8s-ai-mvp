@@ -14,6 +14,7 @@ import {
   getSavedDeploymentAnalysis,
 } from "../../lib/deployment-analysis-api";
 import { buildResourceHref } from "../../lib/routes";
+import { ModalPortal } from "./modal-portal";
 import { StateBanner } from "./state-banner";
 import { SeverityPill } from "./status-pill";
 
@@ -104,13 +105,13 @@ export function DeploymentAnalysisDrawer({
   }
 
   return (
-    <>
+    <ModalPortal>
       <div
         className="fixed inset-0 z-50 bg-black/45"
         onClick={onClose}
       />
-      <aside className="fixed inset-y-0 right-0 z-[60] w-full max-w-3xl overflow-hidden border-l border-black/10 bg-[#f7f5ef] shadow-2xl">
-        <div className="flex h-full flex-col">
+      <aside className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-6">
+        <div className="flex h-[80vh] max-h-[80vh] w-full max-w-3xl flex-col overflow-hidden rounded-[1.75rem] border border-black/10 bg-[#f7f5ef] shadow-2xl">
           <div className="flex items-start justify-between gap-4 border-b border-black/5 bg-white px-5 py-4">
             <div>
               <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-slate-500">
@@ -130,7 +131,7 @@ export function DeploymentAnalysisDrawer({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
             <div className="mb-5 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -385,7 +386,7 @@ export function DeploymentAnalysisDrawer({
           onClose={() => setYamlTarget(null)}
         />
       ) : null}
-    </>
+    </ModalPortal>
   );
 }
 
@@ -475,47 +476,49 @@ function YamlPreviewModal({
   const lines = (yaml ?? "").replace(/\r\n/g, "\n").split("\n");
 
   return (
-    <div className="fixed inset-0 z-[80] overflow-y-auto bg-black/55 px-4 py-6 sm:py-10" onClick={onClose}>
-      <div className="mx-auto w-full max-w-5xl">
-        <div
-          className="flex max-h-[calc(100vh-3rem)] w-full flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-2xl sm:max-h-[calc(100vh-5rem)]"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex items-center justify-between gap-4 border-b border-black/5 px-5 py-4">
-            <div>
-              <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-slate-500">
-                YAML
-              </p>
-              <h3 className="mt-2 font-[var(--font-heading)] text-xl font-semibold text-ink">{title}</h3>
+    <ModalPortal>
+      <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4 py-6" onClick={onClose}>
+        <div className="w-full max-w-5xl">
+          <div
+            className="flex h-[80vh] max-h-[80vh] w-full flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-black/5 px-5 py-4">
+              <div>
+                <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-slate-500">
+                  YAML
+                </p>
+                <h3 className="mt-2 font-[var(--font-heading)] text-xl font-semibold text-ink">{title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Fechar
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Fechar
-            </button>
-          </div>
-          <div className="overflow-auto bg-ink px-5 py-5">
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#06111d]">
-              <table className="min-w-full border-separate border-spacing-0">
-                <tbody>
-                  {lines.map((line, index) => (
-                    <tr key={`${index}-${line}`} className="align-top odd:bg-white/[0.02]">
-                      <td className="select-none border-r border-white/5 px-4 py-1 text-right font-[var(--font-mono)] text-xs text-white/30">
-                        {index + 1}
-                      </td>
-                      <td className="px-4 py-1 font-[var(--font-mono)] text-sm text-white/90 whitespace-pre-wrap break-words">
-                        {line || " "}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-ink px-5 py-5">
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#06111d]">
+                <table className="min-w-full border-separate border-spacing-0">
+                  <tbody>
+                    {lines.map((line, index) => (
+                      <tr key={`${index}-${line}`} className="align-top odd:bg-white/[0.02]">
+                        <td className="select-none border-r border-white/5 px-4 py-1 text-right font-[var(--font-mono)] text-xs text-white/30">
+                          {index + 1}
+                        </td>
+                        <td className="px-4 py-1 font-[var(--font-mono)] text-sm text-white/90 whitespace-pre-wrap break-words">
+                          {line || " "}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

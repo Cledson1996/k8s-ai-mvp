@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import type {
@@ -7,8 +7,9 @@ import type {
   WorkloadsResponse,
 } from "@k8s-ai-mvp/shared";
 import { formatCpu, formatMemory } from "../../lib/format";
+import { ModalPortal } from "../ui/modal-portal";
 
-// ─── Status colour map ────────────────────────────────────────────────────────
+// â”€â”€â”€ Status colour map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const STATUS_COLORS: Record<string, string> = {
   Running: "#22c55e",
@@ -26,19 +27,19 @@ function statusColor(status: string): string {
   return STATUS_COLORS[status] ?? "#94a3b8";
 }
 
-// ─── Icon per workload kind ───────────────────────────────────────────────────
+// â”€â”€â”€ Icon per workload kind â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const KIND_ICONS: Record<string, string> = {
-  Pod: "⬡",
-  ReplicaSet: "⟳",
-  Deployment: "▲",
-  StatefulSet: "◈",
-  DaemonSet: "◉",
-  Job: "▷",
-  CronJob: "◷",
+  Pod: "â¬¡",
+  ReplicaSet: "âŸ³",
+  Deployment: "â–²",
+  StatefulSet: "â—ˆ",
+  DaemonSet: "â—‰",
+  Job: "â–·",
+  CronJob: "â—·",
 };
 
-// ─── Status-bar gauge ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Status-bar gauge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatusBar({
   statuses,
@@ -66,7 +67,7 @@ function StatusBar({
   );
 }
 
-// ─── Status legend chips ──────────────────────────────────────────────────────
+// â”€â”€â”€ Status legend chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function StatusChips({
   statuses,
@@ -95,7 +96,7 @@ function StatusChips({
   );
 }
 
-// ─── Workload card ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Workload card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function WorkloadCard({
   card,
@@ -108,7 +109,7 @@ function WorkloadCard({
   onClick?: () => void;
   hasPodTable: boolean;
 }) {
-  const icon = KIND_ICONS[card.kind] ?? "◻";
+  const icon = KIND_ICONS[card.kind] ?? "â—»";
   const isClickable = hasPodTable && onClick;
 
   return (
@@ -139,7 +140,7 @@ function WorkloadCard({
               isActive ? "bg-tide text-white" : "bg-slate-100 text-slate-500",
             ].join(" ")}
           >
-            {isActive ? "Aberto" : "Ver tabela →"}
+            {isActive ? "Aberto" : "Ver tabela â†’"}
           </span>
         )}
       </div>
@@ -149,7 +150,7 @@ function WorkloadCard({
   );
 }
 
-// ─── Status pill for table rows ───────────────────────────────────────────────
+// â”€â”€â”€ Status pill for table rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function PodStatusPill({ phase, reason }: { phase: string; reason?: string }) {
   const label = reason ?? phase;
@@ -170,7 +171,7 @@ function PodStatusPill({ phase, reason }: { phase: string; reason?: string }) {
   );
 }
 
-// ─── Events modal ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Events modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function EventsModal({
   pod,
@@ -180,97 +181,92 @@ function EventsModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* backdrop */}
-      <div
-        className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      {/* panel */}
-      <div className="relative z-10 flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-black/10 bg-white shadow-halo">
-        {/* header */}
-        <div className="shrink-0 border-b border-black/5 px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.28em] text-slate-400">
-                Eventos do pod
-              </p>
-              <h2 className="mt-1 font-[var(--font-heading)] text-xl font-semibold text-ink">
-                {pod.name}
-              </h2>
-              <p className="text-sm text-slate-500">{pod.namespace}</p>
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
+        <div className="absolute inset-0" onClick={onClose} />
+        <div className="relative z-10 flex h-[80vh] max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-black/10 bg-white shadow-halo">
+          <div className="shrink-0 border-b border-black/5 px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.28em] text-slate-400">
+                  Eventos do pod
+                </p>
+                <h2 className="mt-1 font-[var(--font-heading)] text-xl font-semibold text-ink">
+                  {pod.name}
+                </h2>
+                <p className="text-sm text-slate-500">{pod.namespace}</p>
+              </div>
+              <button
+                onClick={onClose}
+                className="rounded-2xl border border-black/5 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+              >
+                Fechar
+              </button>
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-2xl border border-black/5 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-            >
-              Fechar
-            </button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            {pod.events.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-slate-400">
+                  Nenhum evento registrado para este pod.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pod.events.map((event, idx) => {
+                  const isWarning = event.type === "Warning";
+                  return (
+                    <div
+                      key={idx}
+                      className={[
+                        "rounded-2xl border p-4",
+                        isWarning
+                          ? "border-amber-200 bg-amber-50"
+                          : "border-black/5 bg-slate-50",
+                      ].join(" ")}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={[
+                            "rounded-full px-2 py-0.5 text-xs font-semibold",
+                            isWarning
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-emerald-100 text-emerald-700",
+                          ].join(" ")}
+                        >
+                          {event.type}
+                        </span>
+                        <span className="font-mono text-xs font-medium text-slate-600">
+                          {event.reason}
+                        </span>
+                        {event.count && event.count > 1 ? (
+                          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-500">
+                            x{event.count}
+                          </span>
+                        ) : null}
+                        {event.lastSeen ? (
+                          <span className="ml-auto text-xs text-slate-400">
+                            {event.lastSeen}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 text-sm text-slate-700">
+                        {event.message}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* events list */}
-        <div className="overflow-y-auto px-6 py-4">
-          {pod.events.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-slate-400">
-                Nenhum evento registrado para este pod.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pod.events.map((event, idx) => {
-                const isWarning = event.type === "Warning";
-                return (
-                  <div
-                    key={idx}
-                    className={[
-                      "rounded-2xl border p-4",
-                      isWarning
-                        ? "border-amber-200 bg-amber-50"
-                        : "border-black/5 bg-slate-50",
-                    ].join(" ")}
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={[
-                          "rounded-full px-2 py-0.5 text-xs font-semibold",
-                          isWarning
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-emerald-100 text-emerald-700",
-                        ].join(" ")}
-                      >
-                        {event.type}
-                      </span>
-                      <span className="font-mono text-xs font-medium text-slate-600">
-                        {event.reason}
-                      </span>
-                      {event.count && event.count > 1 && (
-                        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-500">
-                          ×{event.count}
-                        </span>
-                      )}
-                      {event.lastSeen && (
-                        <span className="ml-auto text-xs text-slate-400">
-                          {event.lastSeen}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-2 text-sm text-slate-700">
-                      {event.message}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
-// ─── Pods table ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Pods table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type SortKey =
   | "name"
@@ -350,7 +346,7 @@ function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
         active ? "opacity-100" : "opacity-30",
       ].join(" ")}
     >
-      {active && dir === "desc" ? "↓" : "↑"}
+      {active && dir === "desc" ? "â†“" : "â†‘"}
     </span>
   );
 }
@@ -400,7 +396,7 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
     { label: "Node", key: "nodeName" },
     { label: "Controller", key: "controllerName" },
     { label: "CPU", key: "cpuCores" },
-    { label: "Memória", key: "memoryBytes" },
+    { label: "MemÃ³ria", key: "memoryBytes" },
     { label: "Restarts", key: "restarts" },
     { label: "Idade", key: "age" },
     { label: "", key: null },
@@ -416,7 +412,7 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input
           type="search"
-          placeholder="Filtrar por nome, namespace, node ou controller…"
+          placeholder="Filtrar por nome, namespace, node ou controllerâ€¦"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -426,7 +422,7 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
         />
         <p className="ml-auto shrink-0 text-sm text-slate-400">
           {filtered.length} pod{filtered.length !== 1 ? "s" : ""}
-          {totalPages > 1 && ` · pág. ${currentPage}/${totalPages}`}
+          {totalPages > 1 && ` Â· pÃ¡g. ${currentPage}/${totalPages}`}
         </p>
       </div>
 
@@ -490,9 +486,9 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
                   <td className="px-4 py-3">
                     <span
                       className="block max-w-[160px] truncate font-mono text-xs text-slate-500"
-                      title={pod.nodeName ?? "—"}
+                      title={pod.nodeName ?? "â€”"}
                     >
-                      {pod.nodeName ?? "—"}
+                      {pod.nodeName ?? "â€”"}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -509,7 +505,7 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
                         </span>
                       </span>
                     ) : (
-                      <span className="text-slate-300">—</span>
+                      <span className="text-slate-300">â€”</span>
                     )}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-600">
@@ -554,10 +550,10 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
             onClick={() => setPage((p) => p - 1)}
             className="rounded-xl border border-black/5 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            ← Anterior
+            â† Anterior
           </button>
 
-          {/* page numbers — show up to 7 pills */}
+          {/* page numbers â€” show up to 7 pills */}
           <div className="flex gap-1">
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter(
@@ -576,7 +572,7 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
                     key={`ellipsis-${i}`}
                     className="px-2 py-1 text-sm text-slate-400"
                   >
-                    …
+                    â€¦
                   </span>
                 ) : (
                   <button
@@ -600,7 +596,7 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
             onClick={() => setPage((p) => p + 1)}
             className="rounded-xl border border-black/5 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Próxima →
+            PrÃ³xima â†’
           </button>
         </div>
       )}
@@ -608,7 +604,7 @@ function PodsTable({ pods }: { pods: WorkloadPodDetail[] }) {
   );
 }
 
-// ─── Main screen ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function WorkloadsScreen({
   cards,
@@ -630,7 +626,7 @@ export function WorkloadsScreen({
       {degradedSources.length > 0 && (
         <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4">
           <p className="text-sm font-medium text-amber-700">
-            Algumas fontes estão degradadas:{" "}
+            Algumas fontes estÃ£o degradadas:{" "}
             <span className="font-normal">{degradedSources.join(", ")}</span>
           </p>
         </div>
@@ -642,14 +638,14 @@ export function WorkloadsScreen({
           Workloads
         </p>
         <h2 className="mt-1 font-[var(--font-heading)] text-2xl font-semibold text-ink">
-          Visão de controllers e pods
+          VisÃ£o de controllers e pods
         </h2>
         <p className="mt-1 text-sm text-slate-500">
           Clique no card de Pods para inspecionar a tabela detalhada.
         </p>
       </div>
 
-      {/* cards grid — 2 cols matching reference image */}
+      {/* cards grid â€” 2 cols matching reference image */}
       <div className="grid gap-4 sm:grid-cols-2">
         {cards.map((card) => (
           <WorkloadCard
@@ -662,12 +658,12 @@ export function WorkloadsScreen({
         ))}
       </div>
 
-      {/* pods table — shown when Pods card is active */}
+      {/* pods table â€” shown when Pods card is active */}
       {activeCard === "Pod" && podsCard && (
         <section>
           <div className="mb-4">
             <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.28em] text-slate-400">
-              ⬡ Pods
+              â¬¡ Pods
             </p>
             <h3 className="mt-1 font-[var(--font-heading)] text-xl font-semibold text-ink">
               {podsCard.total} pods no cluster
@@ -679,3 +675,4 @@ export function WorkloadsScreen({
     </div>
   );
 }
+

@@ -16,6 +16,7 @@ import {
   formatMetricTimestamp,
 } from "../../lib/format";
 import { getDeploymentMetrics, getNodeMetrics } from "../../lib/history-api";
+import { ModalPortal } from "./modal-portal";
 import { StateBanner } from "./state-banner";
 
 const WINDOW_OPTIONS: MetricWindow[] = ["1h", "6h", "24h", "7d"];
@@ -194,57 +195,61 @@ function HistoryModalShell({
   children: ReactNode;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/55 px-4 py-6 sm:py-10"
-      onClick={onClose}
-    >
-      <div className="mx-auto w-full max-w-6xl">
-        <div
-          className="flex max-h-[calc(100vh-3rem)] w-full flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-2xl sm:max-h-[calc(100vh-5rem)]"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/5 px-5 py-4">
-            <div>
-              <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-slate-500">
-                Metricas historicas
-              </p>
-              <h3 className="mt-2 font-[var(--font-heading)] text-xl font-semibold text-ink">
-                {title}
-              </h3>
-              <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+    <ModalPortal>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6"
+        onClick={onClose}
+      >
+        <div className="w-full max-w-6xl">
+          <div
+            className="flex h-[80vh] max-h-[80vh] w-full flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/5 px-5 py-4">
+              <div>
+                <p className="font-[var(--font-mono)] text-xs uppercase tracking-[0.24em] text-slate-500">
+                  Metricas historicas
+                </p>
+                <h3 className="mt-2 font-[var(--font-heading)] text-xl font-semibold text-ink">
+                  {title}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="rounded-full border border-black/10 bg-slate-50 p-1">
+                  {WINDOW_OPTIONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => onWindowChange(option)}
+                      className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+                        option === window
+                          ? "bg-ink text-white"
+                          : "text-slate-600 hover:bg-white"
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="rounded-full border border-black/10 bg-slate-50 p-1">
-                {WINDOW_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => onWindowChange(option)}
-                    className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                      option === window
-                        ? "bg-ink text-white"
-                        : "text-slate-600 hover:bg-white"
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Fechar
-              </button>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-[#f7f5ef] px-5 py-5">
+              {children}
             </div>
           </div>
-
-          <div className="overflow-auto bg-[#f7f5ef] px-5 py-5">{children}</div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
